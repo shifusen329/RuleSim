@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    RuleSim builds against two sibling checkouts. Override either on the command line, e.g.
+    dotnet build -p:WrathComboDir=D:\src\WrathCombo
+  -->
+  <PropertyGroup>
+    <WrathComboDir Condition="'$(WrathComboDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\WrathCombo'))</WrathComboDir>
+    <RaidReplayDir Condition="'$(RaidReplayDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\raid-replay'))</RaidReplayDir>
+    <!-- The rule engine files are compiled straight from WrathCombo, so the sim always evaluates rules exactly as the plugin does. -->
+    <WrathComboRulesSrc>$(WrathComboDir)\WrathCombo\CustomRules</WrathComboRulesSrc>
+
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+</Project>

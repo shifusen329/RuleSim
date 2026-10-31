@@ -1,0 +1,591 @@
+124,2,Medica
+125,2,Raise
+131,2,Cure III
+135,2,Cure II
+136,4,Presence of Mind
+137,2,Regen
+140,4,Benediction
+141,2,Fire
+142,2,Blizzard
+149,4,Transpose
+15,3,Riot Blade
+152,2,Fire III
+154,2,Blizzard III
+155,4,Aetherial Manipulation
+156,2,Scathe
+157,4,Manaward
+158,4,Manafont
+159,2,Freeze
+16137,3,Keen Edge
+16138,4,No Mercy
+16139,3,Brutal Shell
+16140,4,Camouflage
+16141,3,Demon Slice
+16142,4,Royal Guard
+16143,3,Lightning Shot
+16145,3,Solid Barrel
+16146,3,Gnashing Fang
+16147,3,Savage Claw
+16149,3,Demon Slaughter
+16150,3,Wicked Talon
+16151,4,Aurora
+16152,4,Superbolide
+16153,3,Sonic Break
+16156,4,Jugular Rip
+16157,4,Abdomen Tear
+16158,4,Eye Gouge
+16159,4,Bow Shock
+16160,4,Heart of Light
+16162,3,Burst Strike
+16164,4,Bloodfest
+16165,4,Blasting Zone
+162,2,Flare
+16457,3,Prominence
+16458,2,Holy Circle
+16459,2,Confiteor
+16460,3,Atonement
+16461,4,Intervene
+16462,3,Mythril Tempest
+16464,4,Nascent Flash
+16465,3,Inner Chaos
+16469,4,Flood of Shadow
+16470,4,Edge of Shadow
+16471,4,Dark Missionary
+16472,4,Living Shadow
+16473,3,Four-point Fury
+16474,4,Enlightenment
+16476,3,Six-sided Star
+16478,4,High Jump
+16479,3,Raiden Thrust
+16480,4,Stardiver
+16481,4,Hissatsu: Senei
+16482,4,Ikishoten
+16485,3,Kaeshi: Goken
+16486,3,Kaeshi: Setsugekka
+16487,4,Shoha
+16489,4,Meisui
+16492,4,Hyosho Ranryu
+16493,4,Bunshin
+16505,2,Despair
+16506,2,Umbral Soul
+16507,2,Xenoglossy
+16508,4,Energy Drain
+16514,2,Fountain of Fire
+16516,4,Enkindle Phoenix
+16527,4,Engagement
+16528,3,Enchanted Reprise
+16530,2,Scorch
+16531,2,Afflatus Solace
+16532,2,Dia
+16534,2,Afflatus Rapture
+16535,2,Afflatus Misery
+16536,4,Temperance
+16537,4,Whispering Dawn
+16538,4,Fey Illumination
+16540,2,Biolysis
+16542,4,Recitation
+16543,4,Fey Blessing
+16545,4,Summon Seraph
+16546,4,Consolation
+16552,4,Divination
+16553,4,Celestial Opposition
+16554,2,Combust III
+16556,4,Celestial Intersection
+16557,4,Horoscope
+16558,4,Horoscope
+16559,4,Neutral Sect
+166,4,Aetherflow
+167,4,Energy Drain
+17105,9,Gunmetal Soul
+17215,2,Summon Eos
+173,2,Resurrection
+17870,2,Ruin II
+185,2,Adloquium
+188,4,Sacred Soil
+18805,4,Ten
+18806,4,Chi
+18807,4,Jin
+18873,4,Fuma Shuriken
+18875,4,Fuma Shuriken
+18877,4,Raiton
+18879,4,Huton
+18881,4,Suiton
+189,4,Lustrate
+198,9,Stronghold
+20,4,Fight or Flight
+200,9,Braver
+201,9,Bladedance
+204,9,Starstorm
+206,9,Healing Wind
+207,9,Breath of the Earth
+208,9,Pulse of Life
+22,4,Bulwark
+2240,3,Spinning Edge
+2241,4,Shade Shift
+2242,3,Gust Slash
+2247,3,Throwing Dagger
+2255,3,Aeolian Edge
+2259,4,Ten
+2261,4,Chi
+2262,4,Shukuchi
+2264,4,Kassatsu
+2266,4,Katon
+2267,4,Raiton
+2268,4,Hyoton
+2271,4,Suiton
+2272,4,Rabbit Medium
+23,4,Circle of Scorn
+24,3,Shield Lob
+24284,2,Diagnosis
+24285,4,Kardia
+24286,2,Prognosis
+24287,2,Egeiro
+24290,2,Eukrasia
+24291,2,Eukrasian Diagnosis
+24294,4,Soteria
+24295,4,Icarus
+24296,4,Druochole
+24298,4,Kerachole
+24299,4,Ixochole
+24300,4,Zoe
+24301,4,Pepsis
+24302,4,Physis II
+24303,4,Taurochole
+24305,4,Haima
+24309,4,Rhizomata
+24310,4,Holos
+24311,4,Panhaima
+24312,2,Dosis III
+24313,2,Phlegma III
+24314,2,Eukrasian Dosis III
+24315,2,Dyskrasia II
+24316,2,Toxikon II
+24317,4,Krasis
+24318,2,Pneuma
+24373,3,Slice
+24374,3,Waxing Slice
+24375,3,Infernal Slice
+24376,3,Spinning Scythe
+24377,3,Nightmare Scythe
+24378,3,Shadow of Death
+24379,3,Whorl of Death
+24380,3,Soul Slice
+24382,3,Gibbet
+24383,3,Gallows
+24385,3,Plentiful Harvest
+24386,2,Harpe
+24387,2,Soulsow
+24388,2,Harvest Moon
+24389,4,Blood Stalk
+24390,4,Unveiled Gibbet
+24391,4,Unveiled Gallows
+24393,4,Gluttony
+24394,4,Enshroud
+24395,3,Void Reaping
+24396,3,Cross Reaping
+24398,2,Communio
+24399,4,Lemure's Slice
+24401,4,Hell's Ingress
+24402,4,Hell's Egress
+24403,4,Regress
+24404,4,Arcane Crest
+24405,4,Arcane Circle
+2469,14,
+2470,14,
+24859,9,Techne Makre
+25746,4,Holy Sheltron
+25747,4,Expiacion
+25748,2,Blade of Faith
+25749,2,Blade of Truth
+25750,2,Blade of Valor
+25751,4,Bloodwhetting
+25753,3,Primal Rend
+25754,4,Oblation
+25755,4,Salt and Darkness
+25756,4,Salt and Darkness
+25757,4,Shadowbringer
+25758,4,Heart of Corundum
+25759,4,Hypervelocity
+25760,3,Double Down
+25762,4,Thunderclap
+25765,3,Celestial Revolution
+25766,4,Riddle of Wind
+25767,3,Shadow of the Destroyer
+25768,3,Rising Phoenix
+25769,3,Phantom Rush
+25771,3,Heavens' Thrust
+25772,3,Chaotic Spring
+25773,4,Wyrmwind Thrust
+25774,3,Phantom Kamaitachi
+25777,3,Forked Raiju
+25778,3,Fleeting Raiju
+25780,3,Fuko
+25781,3,Ogi Namikiri
+25782,3,Kaeshi: Namikiri
+25794,2,High Fire II
+25796,4,Amplifier
+25797,2,Paradox
+25798,2,Summon Carbuncle
+25799,4,Radiant Aegis
+25801,4,Searing Light
+25820,2,Astral Impulse
+25823,2,Ruby Rite
+25824,2,Topaz Rite
+25825,2,Emerald Rite
+25826,2,Tri-disaster
+25830,4,Rekindle
+25831,2,Summon Phoenix
+25835,2,Crimson Cyclone
+25836,4,Mountain Buster
+25837,2,Slipstream
+25838,2,Summon Ifrit II
+25839,2,Summon Titan II
+25840,2,Summon Garuda II
+25855,2,Verthunder III
+25856,2,Veraero III
+25857,4,Magick Barrier
+25858,2,Resolution
+25859,2,Glare III
+25860,2,Holy III
+25861,4,Aquaveil
+25862,4,Liturgy of the Bell
+25865,2,Broil IV
+25866,2,Art of War II
+25867,4,Protraction
+25868,4,Expedient
+25871,2,Fall Malefic
+25872,2,Gravity II
+25873,4,Exaltation
+25874,2,Macrocosmos
+25875,4,Microcosmos
+25885,2,Crimson Strike
+26988,10,the Aether Compass
+27,4,Cover
+27524,2,Pneuma
+28,4,Iron Will
+28509,4,Liturgy of the Bell
+3,10,Sprint
+30,4,Hallowed Ground
+31,3,Heavy Swing
+32065,4,Release Iron Will
+32066,4,Release Defiance
+32067,4,Release Grit
+32068,4,Release Royal Guard
+34606,3,Steel Fangs
+34607,3,Reaving Fangs
+34608,3,Hunter's Sting
+34609,3,Swiftskin's Sting
+34610,3,Flanksting Strike
+34611,3,Flanksbane Fang
+34612,3,Hindsting Strike
+34613,3,Hindsbane Fang
+34614,3,Steel Maw
+34615,3,Reaving Maw
+34620,3,Vicewinder
+34621,3,Hunter's Coil
+34622,3,Swiftskin's Coil
+34623,3,Vicepit
+34624,3,Hunter's Den
+34625,3,Swiftskin's Den
+34626,3,Reawaken
+34627,3,First Generation
+34628,3,Second Generation
+34629,3,Third Generation
+34630,3,Fourth Generation
+34631,3,Ouroboros
+34632,3,Writhing Snap
+34633,3,Uncoiled Fury
+34634,4,Death Rattle
+34636,4,Twinfang Bite
+34637,4,Twinblood Bite
+34638,4,Twinfang Thresh
+34639,4,Twinblood Thresh
+34640,4,First Legacy
+34641,4,Second Legacy
+34642,4,Third Legacy
+34643,4,Fourth Legacy
+34644,4,Uncoiled Twinfang
+34645,4,Uncoiled Twinblood
+34646,4,Slither
+34647,4,Serpent's Ire
+34650,2,Fire in Red
+34651,2,Aero in Green
+34652,2,Water in Blue
+34653,2,Blizzard in Cyan
+34654,2,Stone in Yellow
+34655,2,Thunder in Magenta
+34662,2,Holy in White
+34663,2,Comet in Black
+34664,2,Pom Motif
+34665,2,Wing Motif
+34666,2,Claw Motif
+34667,2,Maw Motif
+34668,2,Hammer Motif
+34669,2,Starry Sky Motif
+34670,4,Pom Muse
+34671,4,Winged Muse
+34672,4,Clawed Muse
+34673,4,Fanged Muse
+34674,4,Striking Muse
+34675,4,Starry Muse
+34676,4,Mog of the Ages
+34677,4,Retribution of the Madeen
+34678,2,Hammer Stamp
+34679,2,Hammer Brush
+34680,2,Polishing Hammer
+34681,2,Star Prism
+34682,2,Star Prism
+34683,4,Subtractive Palette
+34684,4,Smudge
+34685,4,Tempera Coat
+34686,4,Tempera Grassa
+34688,2,Rainbow Drip
+3538,3,Goring Blade
+3539,3,Royal Authority
+3540,4,Divine Veil
+3541,2,Clemency
+3547,4,the Forbidden Chakra
+3549,3,Fell Cleave
+3552,4,Equilibrium
+3554,3,Fang and Claw
+3555,4,Geirskogul
+3556,3,Wheeling Thrust
+3557,4,Battle Litany
+3563,3,Armor Crush
+3566,4,Dream Within a Dream
+3569,4,Asylum
+3570,4,Tetragrammaton
+3571,4,Assize
+3573,4,Ley Lines
+3576,2,Blizzard IV
+3577,2,Fire IV
+3579,2,Ruin III
+3582,4,Deathflare
+3583,4,Indomitability
+3585,4,Deployment Tactics
+3586,4,Emergency Tactics
+3587,4,Dissipation
+3595,2,Aspected Benefic
+3600,2,Helios
+3603,2,Ascend
+3606,4,Lightspeed
+3610,2,Benefic II
+3612,4,Synastry
+3613,4,Collective Unconscious
+3614,4,Essential Dignity
+3617,3,Hard Slash
+3621,2,Unleash
+3623,3,Syphon Strike
+3624,2,Unmend
+3629,4,Grit
+3632,3,Souleater
+3634,4,Dark Mind
+3638,4,Living Dead
+3639,4,Salted Earth
+3643,4,Carve and Spit
+36918,3,Supplication
+36919,3,Sepulchre
+36920,4,Guardian
+36921,4,Imperator
+36922,4,Blade of Honor
+36923,4,Damnation
+36924,4,Primal Wrath
+36925,3,Primal Ruination
+36926,4,Shadowstride
+36927,4,Shadowed Vigil
+36928,3,Scarlet Delirium
+36929,3,Comeuppance
+36930,3,Torcleaver
+36932,3,Disesteem
+36934,4,Trajectory
+36935,4,Great Nebula
+36937,3,Reign of Beasts
+36938,3,Noble Blood
+36939,3,Lion Heart
+36942,4,Forbidden Meditation
+36943,4,Enlightened Meditation
+36944,4,Earth's Reply
+36945,3,Leaping Opo
+36946,3,Rising Raptor
+36947,3,Pouncing Coeurl
+36948,3,Elixir Burst
+36949,3,Wind's Reply
+36950,3,Fire's Reply
+36951,4,Winged Glide
+36952,3,Drakesbane
+36953,4,Rise of the Dragon
+36954,3,Lance Barrage
+36955,3,Spiral Blow
+36956,4,Starcross
+36957,4,Dokumori
+36958,4,Kunai's Bane
+36959,4,Deathfrog Medium
+36960,4,Zesho Meppo
+36961,4,Tenri Jindo
+36962,4,Tengentsu
+36963,3,Gyofu
+36964,4,Zanshin
+36965,3,Tendo Goken
+36966,3,Tendo Setsugekka
+36967,3,Tendo Kaeshi Goken
+36968,3,Tendo Kaeshi Setsugekka
+36969,4,Sacrificium
+36970,3,Executioner's Gibbet
+36971,3,Executioner's Gallows
+36973,3,Perfectio
+36986,2,High Thunder
+36987,2,High Thunder II
+36988,4,Retrace
+36989,2,Flare Star
+36990,4,Necrotize
+36991,4,Searing Flash
+36992,2,Summon Solar Bahamut
+36994,2,Umbral Impulse
+36996,4,Sunflare
+36997,4,Lux Solaris
+36998,4,Enkindle Solar Bahamut
+37,3,Maim
+37004,2,Jolt III
+37005,4,Vice of Thorns
+37006,2,Grand Impact
+37007,4,Prefulgence
+37008,4,Aetherial Shift
+37009,2,Glare IV
+37010,2,Medica III
+37011,4,Divine Caress
+37012,4,Baneful Impaction
+37013,2,Concitation
+37014,4,Seraphism
+37015,2,Manifestation
+37016,2,Accession
+37017,4,Astral Draw
+37018,4,Umbral Draw
+37023,4,the Balance
+37024,4,the Arrow
+37025,4,the Spire
+37026,4,the Spear
+37027,4,the Bole
+37028,4,the Ewer
+37029,4,Oracle
+37030,2,Helios Conjunction
+37031,4,Sun Sign
+37032,2,Eukrasian Dyskrasia
+37033,4,Psyche
+37034,2,Eukrasian Prognosis II
+37035,4,Philosophia
+37037,4,Emergency Tactics
+40,4,Thrill of Battle
+41,3,Overpower
+42,3,Storm's Path
+4247,9,Angel Feathers
+4248,9,Astral Stasis
+4262,3,Form Shift
+43,4,Holmgang
+45,3,Storm's Eye
+45960,3,Enchanted Riposte
+45961,3,Enchanted Zwerchhau
+45962,3,Enchanted Redoublement
+46,3,Tomahawk
+48,4,Defiance
+52,4,Infuriate
+61,3,Twin Snakes
+65,4,Mantra
+66,3,Demolish
+69,4,Perfect Balance
+70,3,Rockbreaker
+7381,3,Total Eclipse
+7382,4,Intervention
+7384,2,Holy Spirit
+7385,4,Passage of Arms
+7386,4,Onslaught
+7387,4,Upheaval
+7388,4,Shake It Off
+7389,4,Inner Release
+7390,4,Delirium
+7392,3,Bloodspiller
+7393,4,The Blackest Night
+7394,4,Riddle of Earth
+7395,4,Riddle of Fire
+7396,4,Brotherhood
+7399,4,Mirage Dive
+74,3,Dragon Kick
+7400,4,Nastrond
+7402,4,Bhavacakra
+7403,4,Ten Chi Jin
+7419,4,Between the Lines
+7421,4,Triplecast
+7422,2,Foul
+7426,2,Ruin IV
+7427,2,Summon Bahamut
+7429,4,Enkindle Bahamut
+7430,4,Thin Air
+7432,4,Divine Benison
+7433,4,Plenary Indulgence
+7434,4,Excogitation
+7436,4,Chain Stratagem
+7437,4,Aetherpact
+7439,4,Earthly Star
+7444,4,Lord of Crowns
+7445,4,Lady of Crowns
+7478,3,Jinpu
+7479,3,Shifu
+7480,3,Yukikaze
+7481,3,Gekko
+7482,3,Kasha
+7484,3,Mangetsu
+7485,3,Oka
+7486,3,Enpi
+7487,3,Midare Setsugekka
+7488,3,Tenka Goken
+7489,3,Higanbana
+7490,4,Hissatsu: Shinten
+7491,4,Hissatsu: Kyuten
+7492,4,Hissatsu: Gyoten
+7493,4,Hissatsu: Yaten
+7497,4,Meditate
+7499,4,Meikyo Shisui
+75,3,True Thrust
+7504,3,Riposte
+7506,4,Corps-a-corps
+7510,2,Verfire
+7511,2,Verstone
+7514,2,Vercure
+7515,4,Displacement
+7517,4,Fleche
+7518,4,Acceleration
+7519,4,Contre Sixte
+7520,4,Embolden
+7521,4,Manafication
+7523,2,Verraise
+7525,2,Verflare
+7526,2,Verholy
+7527,3,Enchanted Riposte
+7528,3,Enchanted Zwerchhau
+7529,3,Enchanted Redoublement
+7531,4,Rampart
+7533,4,Provoke
+7535,4,Reprisal
+7537,4,Shirk
+7538,4,Interject
+7540,4,Low Blow
+7541,4,Second Wind
+7542,4,Bloodbath
+7546,4,True North
+7548,4,Arm's Length
+7549,4,Feint
+7559,4,Surecast
+7560,4,Addle
+7561,4,Swiftcast
+7562,4,Lucid Dreaming
+7568,2,Esuna
+7571,4,Rescue
+7861,9,Doom of the Living
+7863,4,Leg Sweep
+7869,4,Dissolve Union
+83,4,Life Surge
+8324,4,Stellar Detonation
+85,4,Lance Charge
+9,3,Fast Blade
+90,3,Piercing Talon
+94,4,Elusive Jump
+96,4,Dragonfire Dive

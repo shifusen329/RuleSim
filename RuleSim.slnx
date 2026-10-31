@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RuleSim/RuleSim.csproj" />
+    <Project Path="src/RuleHarness/RuleHarness.csproj" />
+  </Folder>
+  <Folder Name="/legacy/">
+    <Project Path="legacy/SamSim/SamSim.csproj" />
+  </Folder>
+</Solution>

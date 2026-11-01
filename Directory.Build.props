@@ -1,11 +1,26 @@
 <Project>
   <!--
-    RuleSim builds against two sibling checkouts. Override either on the command line, e.g.
+    RuleSim builds against a WrathCombo and a raid-replay checkout, found in this order:
+      1. the repository RuleSim is a submodule of, when it is that one (e.g. WrathCombo/RuleSim);
+      2. a sibling checkout (../WrathCombo, ../raid-replay: RuleSim checked out on its own);
+      3. one beside the repository RuleSim is a submodule of (../../WrathCombo, e.g. from AnoMech/RuleSim).
+    Override either on the command line, e.g.
     dotnet build -p:WrathComboDir=D:\src\WrathCombo
   -->
   <PropertyGroup>
-    <WrathComboDir Condition="'$(WrathComboDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\WrathCombo'))</WrathComboDir>
-    <RaidReplayDir Condition="'$(RaidReplayDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\raid-replay'))</RaidReplayDir>
+    <_RuleSimUp1>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</_RuleSimUp1>
+    <_RuleSimUp2>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</_RuleSimUp2>
+
+    <WrathComboDir Condition="'$(WrathComboDir)' == '' and Exists('$(_RuleSimUp1)\WrathCombo\CustomRules\RuleSet.cs')">$(_RuleSimUp1)</WrathComboDir>
+    <WrathComboDir Condition="'$(WrathComboDir)' == '' and Exists('$(_RuleSimUp1)\WrathCombo\WrathCombo\CustomRules\RuleSet.cs')">$(_RuleSimUp1)\WrathCombo</WrathComboDir>
+    <WrathComboDir Condition="'$(WrathComboDir)' == '' and Exists('$(_RuleSimUp2)\WrathCombo\WrathCombo\CustomRules\RuleSet.cs')">$(_RuleSimUp2)\WrathCombo</WrathComboDir>
+    <WrathComboDir Condition="'$(WrathComboDir)' == ''">$(_RuleSimUp1)\WrathCombo</WrathComboDir>
+
+    <RaidReplayDir Condition="'$(RaidReplayDir)' == '' and Exists('$(_RuleSimUp1)\RaidReplay.Core\RaidReplay.Core.csproj')">$(_RuleSimUp1)</RaidReplayDir>
+    <RaidReplayDir Condition="'$(RaidReplayDir)' == '' and Exists('$(_RuleSimUp1)\raid-replay\RaidReplay.Core\RaidReplay.Core.csproj')">$(_RuleSimUp1)\raid-replay</RaidReplayDir>
+    <RaidReplayDir Condition="'$(RaidReplayDir)' == '' and Exists('$(_RuleSimUp2)\raid-replay\RaidReplay.Core\RaidReplay.Core.csproj')">$(_RuleSimUp2)\raid-replay</RaidReplayDir>
+    <RaidReplayDir Condition="'$(RaidReplayDir)' == ''">$(_RuleSimUp1)\raid-replay</RaidReplayDir>
+
     <!-- The rule engine files are compiled straight from WrathCombo, so the sim always evaluates rules exactly as the plugin does. -->
     <WrathComboRulesSrc>$(WrathComboDir)\WrathCombo\CustomRules</WrathComboRulesSrc>
 

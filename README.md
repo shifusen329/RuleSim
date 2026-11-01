@@ -39,7 +39,12 @@ Movement is the main approximation. The log gives a position about once a second
 ## Requirements
 
 - The .NET 10 SDK.
-- Two sibling checkouts next to this repository: `../WrathCombo` (the rule engine source and the rule files) and `../raid-replay` (`RaidReplay.Core`). To point elsewhere, add `-p:WrathComboDir=...` or `-p:RaidReplayDir=...` to `dotnet build`.
+- A WrathCombo checkout (the rule engine source and the rule files) and a raid-replay checkout (`RaidReplay.Core`). `Directory.Build.props` finds each one in this order:
+  1. The repository RuleSim is a submodule of, when it is that one (`WrathCombo/RuleSim`).
+  2. A sibling checkout: `../WrathCombo`, `../raid-replay`.
+  3. One beside the repository RuleSim is a submodule of: `../../WrathCombo`, `../../raid-replay` (e.g. from `AnoMech/RuleSim`).
+
+  To point elsewhere, add `-p:WrathComboDir=...` or `-p:RaidReplayDir=...` to `dotnet build`.
 - For RuleHarness only: a Release build of WrathCombo.
 
 ## Build and run

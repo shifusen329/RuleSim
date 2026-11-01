@@ -448,6 +448,43 @@ E2E("UI order: RDM Custom Rules between Simple and Advanced", Order("RDM_AoE_Sim
 var rdmGauge = Prop<IReadOnlyList<string>>(symbolsType.GetMethod("For")!.Invoke(null, ["RDM"])!, "GaugeFields");
 E2E("RDM gauge fields", rdmGauge.Contains("WhiteMana") && rdmGauge.Contains("BlackMana") && rdmGauge.Contains("ManaStacks"), string.Join(", ", rdmGauge));
 E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetManifestResourceNames().Contains($"WrathCombo.CustomRules.Examples.{n}.json")));
+{
+    var examples = Path.GetDirectoryName(Path.GetFullPath(samPath))!;
+    List<object> RuleList(object set) => ((IEnumerable)Prop<object>(set, "Rules")).Cast<object>().ToList();
+    int Index(List<object> rs, string name) => rs.FindIndex(r => Prop<string>(r, "Name") == name);
+    object Rules(string file) => Prop<object>(Load(File.ReadAllText(Path.Combine(examples, file)), Path.Combine(examples, file)), "Set");
+    Dictionary<string, string> Defines(string file) => ((IEnumerable)Prop<object>(Rules(file), "Defines")).Cast<object>()
+        .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+
+    // The finisher follows the mana (2026-10-31, user): Verflare whenever white is higher, Verholy whenever black is,
+    // whatever procs are up; at equal mana Verflare only to fish for a missing Verfire.
+    var st = RuleList(Rules("RDM_ST.json"));
+    var flare = Prop<string>(st[Index(st, "Verflare")], "WhenSource");
+    bool Flare(int w, int b, int stone, int fire) => Eval(flare, new() { ["stacks"] = "3", ["white"] = $"{w}", ["black"] = $"{b}", ["stone"] = $"{stone}", ["fire"] = $"{fire}" }) == 1;
+    var procs = new[] { (0, 0), (1, 0), (0, 1), (1, 1) };
+    E2E("RDM_ST: Verflare whenever white is higher, never when black is, whatever procs are up",
+        procs.All(p => Flare(47, 36, p.Item1, p.Item2) && Flare(20, 19, p.Item1, p.Item2) && !Flare(36, 47, p.Item1, p.Item2) && !Flare(19, 20, p.Item1, p.Item2)));
+    E2E("RDM_ST: at equal mana Verflare only with Verstone Ready and no Verfire Ready", Flare(30, 30, 1, 0) && !Flare(30, 30, 0, 0) && !Flare(30, 30, 0, 1) && !Flare(30, 30, 1, 1));
+    E2E("RDM_ST: Verholy right after Verflare at three stacks", Index(st, "Verholy") == Index(st, "Verflare") + 1
+        && Prop<string>(st[Index(st, "Verholy")], "WhenSource") == "stacks == 3");
+    var aoe = RuleList(Rules("RDM_AoE.json"));
+    E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"
+        && Defines("RDM_AoE.json")["blackHigher"] == "black >= white");
+
+    // DMU_Mit_RDM (2026-10-31, user): the first Addle lands before the first Double-trouble Trap (confetti) hit
+    // (Mystery Magic #1 + 17.2) and lasts through the first Light of Judgment hit (+30.4): pressed from +15.0, right
+    // before a cast too, and a hard cast that would start in the second before that window waits for it.
+    var plan = RuleList(Rules("DMU_Mit_RDM.json"));
+    var pd = Defines("DMU_Mit_RDM.json");
+    E2E("DMU_Mit_RDM: confetti Addle window from Mystery Magic + 15.0, the hold from + 14.0",
+        pd["dttMain"] == "castsSeen(MysteryMagic) == 1 && sinceCast(MysteryMagic) >= 15.0"
+        && pd["dttSoon"] == "castsSeen(MysteryMagic) == 1 && sinceCast(MysteryMagic) >= 14.0 && sinceCast(MysteryMagic) < 15.0"
+        && pd["dtt1"].StartsWith("dttMain || ") && pd["addleWhen"].StartsWith("dtt1 || "), $"{pd.GetValueOrDefault("dttMain")} | {pd.GetValueOrDefault("dttSoon")}");
+    E2E("DMU_Mit_RDM: the confetti Addle may go right before a cast (shortAddle)", pd["shortAddle"].Split(" || ").Contains("dttMain"));
+    var hold = Index(plan, "Hold the cast for Addle (plan)");
+    E2E("DMU_Mit_RDM: a hard cast waits for the confetti Addle, right after the Addle rule", hold > 0 && hold == Index(plan, "Addle (plan)") + 1
+        && Prop<uint>(plan[hold], "ActionId") == 1000004 && Prop<string>(plan[hold], "WhenSource").StartsWith("dttSoon && hardNext && "));
+}
 
 // ---- Reaper: two modes ----
 foreach (var (m, id, aoe, buttons) in new[] { ("RPR_ST_CustomRules", 12030, false, new uint[] { 24373 }), ("RPR_AoE_CustomRules", 12230, true, new uint[] { 24376 }) })

@@ -188,6 +188,8 @@ internal static class AstCommands
         /// <summary> Logged damage per source against its potency (the potency table's check). </summary>
         public readonly Dictionary<string, (double Dmg, double Pot)> Check = new();
         public int Gcds, Cancels, Draws, CardPlays;
+        /// <summary> The logged Earthly Star explosions: when, party members it healed, enemies it hit, inside the player's Divination. </summary>
+        public readonly List<(int T, int Healed, int Bosses, bool InDiv)> Stars = new();
         public double DotUpMs;
         public List<StatusInterval> Mine = new();
         public List<(int S, int E)> Div = new();
@@ -212,6 +214,9 @@ internal static class AstCommands
         {
             var tgt = e.PrimaryTarget ?? e.Hits.FirstOrDefault()?.Target;
             a.Events.Add((e.Cast?.StartMs ?? e.T, e.Name, tgt is { IsPlayer: true } && tgt.Id != meId ? tgt.Name : ""));
+            if (e.Name is "Stellar Explosion" or "Stellar Burst" && e.T >= -3000)
+                a.Stars.Add((e.T, e.Hits.Where(h => h.Target.IsPlayer && h.Kind == HitKind.Heal).Select(h => h.Target.Id).Distinct().Count(),
+                    e.Hits.Where(h => !h.Target.IsPlayer && h.Kind == HitKind.Damage).Select(h => h.Target.Id).Distinct().Count(), a.Div.Any(d => d.S <= e.T && e.T < d.E)));
             if (e.T < -3000) continue;
             if (e.T >= 0)
             {
@@ -320,7 +325,9 @@ internal static class AstCommands
         public double Avail, SimPot, RealPot, SimContrib, RealContrib, SimDivOverlap, RealDivOverlap, HealRules, HealReal, CfMin = 100, LogMin = 100;
         public int SimGcd, RealGcd, SimCanc, RealCanc, MinMp = 10000, SimDivs, RealDivs, SimCards, SimCardsIn, SimCardsRight, RealCards, RealCardsIn, RealCardsRight,
             SimLord, SimLordIn, SimOracle, SimOracleIn, RealLord, RealLordIn, RealOracle, RealOracleIn, SimStars, SimStarsManual, RealStars, SimLs, RealLs,
-            SimLost, RealDraws, RealPlays, AccHeals, AccDanger, RealAccDanger, Unmodelled, CastsLost;
+            SimLost, RealDraws, RealPlays, AccHeals, AccDanger, RealAccDanger, Unmodelled, CastsLost,
+            // Earthly Star explosions: how many, party members healed (summed), inside Divination
+            SimBooms, SimBoomHealed, SimBoomInDiv, RealBooms, RealBoomHealed, RealBoomInDiv;
         public double SimDot, RealDot, OneAvail, OneSim, OneReal;   // One*: single-boss phases (P1, P2, P5)
         public List<Metrics.Slot> Slots = new();
         public readonly Dictionary<string, int> SimCounts = new(), RealCounts = new();
@@ -429,6 +436,9 @@ internal static class AstCommands
         }
         row.SimStars = sim.StarLog.Count(s => s.Placed >= -20000); row.SimStarsManual = sim.StarLog.Count(s => s.Manual);
         row.RealStars = act.Counts.GetValueOrDefault("Earthly Star");
+        var booms = sim.StarLog.Where(s => s.Healed >= 0).ToList();
+        row.SimBooms = booms.Count; row.SimBoomHealed = booms.Sum(s => s.Healed); row.SimBoomInDiv = booms.Count(s => s.InDiv);
+        row.RealBooms = act.Stars.Count; row.RealBoomHealed = act.Stars.Sum(s => s.Healed); row.RealBoomInDiv = act.Stars.Count(s => s.InDiv);
         row.SimLs = row.SimCounts["Lightspeed"]; row.RealLs = act.Counts.GetValueOrDefault("Lightspeed");
         row.SimLost = sim.CardsLost; row.RealDraws = act.Draws; row.RealPlays = act.CardPlays;
         row.Slots = Slots(x, act, sheet);
@@ -493,6 +503,8 @@ internal static class AstCommands
         Rw("Oracle in Divination / all", r.SimOracleIn, r.RealOracleIn); Rw("  all", r.SimOracle, r.RealOracle);
         Rw("cards lost to a draw (rules) / drawn-played (logged)", r.SimLost, r.RealDraws * 4 - r.RealPlays);
         Rw("Earthly Stars (rules: manual detonations next row)", r.SimStars, r.RealStars); Rw("  detonated by hand", r.SimStarsManual, act.Counts.GetValueOrDefault("Stellar Detonation"));
+        Rw("  explosions / inside Divination", r.SimBooms, r.RealBooms); Rw("    inside Divination", r.SimBoomInDiv, r.RealBoomInDiv);
+        Rw("  party healed per explosion (avg)", r.SimBoomHealed / (double)Math.Max(1, r.SimBooms), r.RealBoomHealed / (double)Math.Max(1, r.RealBooms), "0.00");
         Rw("Lightspeed", r.SimLs, r.RealLs);
         Rw("MP low", r.MinMp, null);
         Rw("GCD clipped by weaves (s)", sim.ClipMs / 1000.0, null, "0.0");
@@ -505,7 +517,9 @@ internal static class AstCommands
                               string.Join(", ", sim.Log.Where(e => e.T >= p - 8000 && e.T <= p + 20000 && e.What is "Lightspeed" or "the Balance" or "the Spear" or "Lord of Crowns" or "Oracle" or "Astral Draw" or "Umbral Draw" or "Combust III" or "Earthly Star")
                                   .Select(e => $"{(e.T - p) / 1000.0:+0.0;-0.0} {e.What}{(e.Target.Length > 0 ? "->" + e.Target.Split(' ')[0] : "")}")));
         if (sim.LostLog.Count > 0) Console.WriteLine("   cards lost: " + string.Join("; ", sim.LostLog.Select(l => $"{F(l.T)} {l.Lost}")));
-        Console.WriteLine("   Earthly Star: " + string.Join("; ", sim.StarLog.Select(st => $"{F(st.Placed)}->{F(st.Ended)}{(st.Manual ? " by hand" : "")}{(st.Giant ? "" : " (not charged)")}")));
+        Console.WriteLine("   Earthly Star: " + string.Join("; ", sim.StarLog.Select(st => $"{F(st.Placed)}->{F(st.Ended)}{(st.Manual ? " by hand" : "")}{(st.Giant ? "" : " (not charged)")}" +
+                                                                   (st.Healed >= 0 ? $" [{st.Healed}/{st.Alive}{(st.Bosses != 1 ? $", {st.Bosses} bosses" : "")}{(st.InDiv ? ", Div" : "")}]" : ""))));
+        Console.WriteLine("   logged Earthly Star explosions: " + string.Join("; ", act.Stars.Select(s => $"{F(s.T)} [{s.Healed}{(s.Bosses != 1 ? $", {s.Bosses} bosses" : "")}{(s.InDiv ? ", Div" : "")}]")));
         // sheet
         if (r.Slots.Count > 0)
         {
@@ -533,6 +547,11 @@ internal static class AstCommands
             var idl = sim.Idle.Where(i => i.Phase == phase).GroupBy(i => i.Reason).Select(g => (g.Key, Ms: g.Sum(i => i.Ms))).OrderByDescending(g => g.Ms).ToList();
             Console.WriteLine($"   {phase,-18} {p.Avail / 1000.0,6:0} {100.0 * p.Busy / Math.Max(1, p.Avail),7:0.0} {100.0 * p.Dot / Math.Max(1, p.Avail),8:0} {sim.Log.Count(e => In(e.T) && AstSim.GcdNames.Contains(e.What)),5} {sim.CancelLog.Count(c => In(c.T)),7} " +
                               $"{pot / Math.Max(0.01, p.Avail / 60000.0),8:0} {real / Math.Max(0.01, p.Avail / 60000.0),7:0} {idl.Sum(i => i.Ms) / 1000.0,7:0.0} " + string.Join("; ", idl.Take(3).Select(i => $"{i.Key} {i.Ms / 1000.0:0.0}")));
+            // --sources: the phase's damage by source (count, potency x raid-buff multiplier), rules then logged
+            if (A.Contains("--sources"))
+                foreach (var (label, list) in new[] { ("rules", sim.Damage), ("logged", act.Damage) })
+                    Console.WriteLine($"      {label,-7}" + string.Join(", ", list.Where(d => In(d.T)).GroupBy(d => d.Src).OrderByDescending(g => g.Sum(d => d.Potency * d.Mult))
+                        .Select(g => $"{g.Key} {g.Count()}x {g.Sum(d => d.Potency * d.Mult) / 1000:0.0}k (x{g.Average(d => d.Mult):0.000})")));
         }
         Console.WriteLine("   GCD idle while a target was up, by reason and rule (s):");
         foreach (var g in sim.Idle.GroupBy(i => (i.Reason, i.Rule)).Select(g => (g.Key, Ms: g.Sum(i => i.Ms), N: g.Count())).OrderByDescending(g => g.Ms).Take(12))
@@ -574,6 +593,8 @@ internal static class AstCommands
         Rw("Oracle (in Divination)", rows.Sum(r => r.SimOracleIn), rows.Sum(r => r.RealOracleIn)); Rw("  all", rows.Sum(r => r.SimOracle), rows.Sum(r => r.RealOracle));
         Rw("cards lost (rules) / drawn-not-played (logged)", rows.Sum(r => r.SimLost), rows.Sum(r => r.RealDraws * 4 - r.RealPlays));
         Rw("Earthly Stars", rows.Sum(r => r.SimStars), rows.Sum(r => r.RealStars));
+        Rw("  explosions", rows.Sum(r => r.SimBooms), rows.Sum(r => r.RealBooms)); Rw("    inside Divination", rows.Sum(r => r.SimBoomInDiv), rows.Sum(r => r.RealBoomInDiv));
+        Rw("  party healed per explosion (avg)", rows.Sum(r => r.SimBoomHealed) / (double)Math.Max(1, rows.Sum(r => r.SimBooms)), rows.Sum(r => r.RealBoomHealed) / (double)Math.Max(1, rows.Sum(r => r.RealBooms)), "0.00");
         Rw("Lightspeed", rows.Sum(r => r.SimLs), rows.Sum(r => r.RealLs));
         foreach (var n in Counted) Rw($"{n} (count)", rows.Sum(r => r.SimCounts[n]), rows.Sum(r => r.RealCounts[n]));
         if (slots.Count > 0)
@@ -591,7 +612,9 @@ internal static class AstCommands
         Console.WriteLine($"SUMMARY pulls={rows.Count} mins={mins:0.0} pot={rows.Sum(r => r.SimPot) / mins:0} real={rows.Sum(r => r.RealPot) / mins:0} pot1={rows.Sum(r => r.OneSim) / oneMins:0} real1={rows.Sum(r => r.OneReal) / oneMins:0} party={rows.Sum(r => r.SimContrib) / 1e6:0.00} realparty={rows.Sum(r => r.RealContrib) / 1e6:0.00} " +
                           $"gcd={rows.Sum(r => r.SimGcd) / mins:0.00} realgcd={rows.Sum(r => r.RealGcd) / mins:0.00} canc={rows.Sum(r => r.SimCanc)} mp={rows.Min(r => r.MinMp)} " +
                           $"combust={100 * rows.Sum(r => r.SimDot) / rows.Sum(r => r.Avail):0.0} cardsIn={rows.Sum(r => r.SimCardsIn)}/{rows.Sum(r => r.SimCards)} lost={rows.Sum(r => r.SimLost)} stars={rows.Sum(r => r.SimStars)} " +
-                          $"slots={slots.Count(x => x.Sim)}/{slots.Count} realslots={slots.Count(x => x.Real)} cf={rows.Min(r => r.CfMin):0} heal={rows.Sum(r => r.HealRules) / 1e6:0.00} acc={rows.Sum(r => r.AccDanger)}/{rows.Sum(r => r.AccHeals)}");
+                          $"slots={slots.Count(x => x.Sim)}/{slots.Count} realslots={slots.Count(x => x.Real)} cf={rows.Min(r => r.CfMin):0} heal={rows.Sum(r => r.HealRules) / 1e6:0.00} acc={rows.Sum(r => r.AccDanger)}/{rows.Sum(r => r.AccHeals)} " +
+                          $"starheal={rows.Sum(r => r.SimBoomHealed) / (double)Math.Max(1, rows.Sum(r => r.SimBooms)):0.00}/{rows.Sum(r => r.RealBoomHealed) / (double)Math.Max(1, rows.Sum(r => r.RealBooms)):0.00} " +
+                          $"starDiv={rows.Sum(r => r.SimBoomInDiv)}/{rows.Sum(r => r.SimBooms)} realStarDiv={rows.Sum(r => r.RealBoomInDiv)}/{rows.Sum(r => r.RealBooms)} divOverlap={rows.Sum(r => r.SimDivOverlap) / Math.Max(1, rows.Sum(r => r.SimDivs)):0.0}/{rows.Sum(r => r.RealDivOverlap) / Math.Max(1, rows.Sum(r => r.RealDivs)):0.0}");
     }
 
     private static void PrintTanks(List<(string Pull, TankMetrics.Result R, List<AstTankMetrics.Episode> E)> tanks)

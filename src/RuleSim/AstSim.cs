@@ -116,7 +116,9 @@ internal sealed class AstSim : IRuleRuntime
     public readonly List<(int T, string Card, Actor Target, bool Right, bool InDiv)> CardPlays = new();
     public readonly List<(int T, string Lost)> LostLog = new();
     public readonly List<(int T, string What, bool InDiv)> BurstPresses = new();   // Divination, Lord of Crowns, Oracle
-    public readonly List<(int Placed, int Ended, bool Manual, bool Giant)> StarLog = new();
+    /// <summary> Earthly Stars: placed, went off, by hand, charged; at the explosion the living party within its 20 y
+    /// (Healed, of Alive; -1 when it never went off), the bosses it hit, and whether the rules' Divination was up. </summary>
+    public readonly List<(int Placed, int Ended, bool Manual, bool Giant, int Healed, int Alive, int Bosses, bool InDiv)> StarLog = new();
     /// <summary> The rules' heals that landed on a player with an Accretion (1604): (time, target, source, seconds since
     /// another Accretion came off; a removal inside its 2 s vulnerability wipes, so under 3.2 s is the danger). </summary>
     public readonly List<(int T, Actor Target, string Src, double SinceOtherOff)> AccretionHeals = new();
@@ -373,6 +375,8 @@ internal sealed class AstSim : IRuleRuntime
                 RuleTarget.Raise => W.Party.FirstOrDefault(p => W.Dead(p, T)),
                 RuleTarget.CastTarget => CastTargetAt(spec.Cast ?? "", p => Ok(p)),
                 RuleTarget.Card => CardTarget() is { } ct && Ok(ct) ? ct : null,
+                // your hostile hard target (Earthly Star then goes where it stands)
+                RuleTarget.Enemy => Target is { IsPlayer: false } e && Ok(e) ? e : null,
                 _ => null,
             };
             if (c is not null) { pendingTarget = c; return action; }
@@ -436,7 +440,7 @@ internal sealed class AstSim : IRuleRuntime
             dots.Clear();
             if (Card1 + Card2 + Card3 + Crown > 0) LostLog.Add((T, "died"));
             Card1 = Card2 = Card3 = Crown = 0;
-            if (StarOut) { StarLog.Add((starAt, T, false, starGiant)); starAt = int.MinValue; }
+            if (StarOut) { StarLog.Add((starAt, T, false, starGiant, -1, 0, 0, false)); starAt = int.MinValue; }
             Log.Add(new SimEvent(T, "DIED", "", ""));
         }
         wasDead = dead;
@@ -547,18 +551,26 @@ internal sealed class AstSim : IRuleRuntime
     {
         foreach (var k in st.Where(kv => Barriers.Contains(kv.Key.Item2)).Select(kv => kv.Key).ToList())
             if (W.Party.FirstOrDefault(p => p.Id == k.Item1) is { } who) EndShield(who, k.Item2, st[k], Math.Min(st[k].Expire, T), "pull ended");
-        if (StarOut) StarLog.Add((starAt, T, false, starGiant));
+        if (StarOut) StarLog.Add((starAt, T, false, starGiant, -1, 0, 0, false));
     }
 
     private void Detonate(bool manual, string how)
     {
         var giant = starGiant;
         var at = manual ? T : starAt + 20000;
+        var bosses = 0;
         foreach (var b in W.Bosses.Where(b => b.IsPresent(at) && b.IsTargetable(at) && !b.IsHidden(at) && Vector2.Distance(W.Pos(b, at), starPos) <= 20 + b.Radius))
+        {
+            bosses++;
             if (at >= -3000) Damage.Add((Math.Max(0, at), giant ? "Stellar Explosion" : "Stellar Burst", giant ? 310 : 205, RaidBuffs(b).Mult));
+        }
+        var healed = 0;
         foreach (var p in W.Party.Where(p => !W.Dead(p, at) && Vector2.Distance(W.Pos(p, at), starPos) <= 20))
+        {
+            healed++;
             AddHeal(at, p, (giant ? 720 : 540) * HealMult(null, p), giant ? "Stellar Explosion" : "Stellar Burst");
-        StarLog.Add((starAt, at, manual, giant));
+        }
+        StarLog.Add((starAt, at, manual, giant, healed, W.Party.Count(p => !W.Dead(p, at)), bosses, Has(AS.Divination)));
         Log.Add(new SimEvent(at, giant ? "Stellar Explosion" : "Stellar Burst", "", how));
         starAt = int.MinValue; starGiant = false;
         Drop(W.Me, AS.EarthlyDominance); Drop(W.Me, AS.GiantDominance);

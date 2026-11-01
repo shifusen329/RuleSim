@@ -257,6 +257,10 @@ Check("target list: current alone", !RuleTargets.TryParse("current, self", symbo
 Check("target list: dot(4)", RuleTargets.TryParse("dot(4)", symbols, out var dot4, out _) && dot4[0].Kind == RuleTarget.Dot && dot4[0].MaxEnemies == 4);
 Check("target list: dot alone has no enemy limit", RuleTargets.TryParse("dot", symbols, out var dot0, out _) && dot0[0].Kind == RuleTarget.Dot && dot0[0].MaxEnemies == 0);
 Check("target list: dot(0) refused", !RuleTargets.TryParse("dot(0)", symbols, out _, out var e3) && e3!.Contains("dot needs"), e3 ?? "");
+// `enemy` (2026-11-01): your hostile hard target, so a ground action (Earthly Star) goes where the boss stands; "hostile" too.
+Check("target list: enemy, self", RuleTargets.TryParse("enemy, self", symbols, out var enemySelf, out _) && enemySelf is [{ Kind: RuleTarget.Enemy }, { Kind: RuleTarget.Self }]
+                                  && RuleTargets.TryParseKind("hostile", out var hostileKind) && hostileKind == RuleTarget.Enemy
+                                  && RuleTargets.Names.Contains("enemy"));
 errors.Clear();
 var chained = RuleSetCompiler.Compile(new RuleSetFile { Job = "SAM", Replaces = ["Hakaze"], Rules = [new RuleFile { Action = "Senei", Target = " tank !shield, self " }] }, "c", symbols, _ => functions, errors)!;
 Check("chained target compiles and keeps its source", chained is not null && chained.Rules[0].Target.Length == 2 && chained.Rules[0].TargetSource == "tank !shield, self", string.Join(" | ", errors));
@@ -944,7 +948,56 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
     // AST_AoE_DPS.json copies the single-target file's burst, card, heal and moving rules: every rule both name alike is identical.
     E2E($"AST_AoE_DPS: {shared.Count} rules shared with AST_ST_DPS, all identical", shared.Count >= 40 && differ.Count == 0, string.Join(", ", differ));
     E2E("AST_AoE_DPS spreads Combust with dot(4)", aoeRules.Any(r => Prop<string>(r, "Name") == "Combust (spread on the pack)" && r.GetType().GetProperty("TargetSource")!.GetValue(r) as string == "dot(4)"));
-    // Every level: no level gate, spells by their hooked base form.
+
+    // 2026-11-01, the five top FFLogs Astrologians (Dancing Mad) against the rules:
+    var stRules = AstRules("AST_ST_DPS.json");
+    object AR(List<object> rs, string name) => rs.First(r => Prop<string>(r, "Name") == name);
+    string When(List<object> rs, string name) => Prop<string>(AR(rs, name), "WhenSource");
+    string? Target(List<object> rs, string name) => AR(rs, name).GetType().GetProperty("TargetSource")!.GetValue(AR(rs, name)) as string;
+    Dictionary<string, string> AstDefines(string f) => ((IEnumerable)Prop<object>(Prop<object>(Load(File.ReadAllText(Path.Combine(examples, f)), Path.Combine(examples, f)), "Set"), "Defines")).Cast<object>()
+        .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+    // The burst goes while the GCD is held for movement too (weave-only, the rules' Divinations came 0.3-5.7 s after theirs).
+    var burst = new[] { "Divination", "Play I (The Balance or The Spear) in Divination", "Lightspeed (burst)", "Lord of Crowns", "The Spire before the next draw",
+        "The Ewer before the next draw", "The Arrow before the next draw", "The Bole before the next draw", "Lady of Crowns before the next draw", "Draw", "Oracle" };
+    var notHeld = burst.Where(n => !When(stRules, n).StartsWith("(canWeave || gcdHeld) && ") || Prop<bool>(AR(stRules, n), "Weave")).ToList();
+    E2E("AST_ST_DPS: the burst also while the GCD is held (canWeave || gcdHeld, not weave-only)", notHeld.Count == 0, string.Join(", ", notHeld));
+    // Earthly Star where the boss stands (their stars 0-3.5 y from it, healing 7.8-8.0 of 8), where you stand with the option off.
+    E2E("AST_ST_DPS: Earthly Star on the enemy (optStarOnTarget), where you stand otherwise",
+        Target(stRules, "Earthly Star (on cooldown)") == "enemy, self" && When(stRules, "Earthly Star (on cooldown)").Contains("&& optStarOnTarget &&")
+        && Target(stRules, "Earthly Star (on cooldown, where you stand)") == "self" && When(stRules, "Earthly Star (on cooldown, where you stand)").Contains("&& !optStarOnTarget &&")
+        && Target(stRules, "Earthly Star on the countdown") == "enemy, self" && Target(stRules, "Earthly Star on the countdown (where you stand)") == "self"
+        && AstDefines("AST_ST_DPS.json")["optStarOnTarget"] == "1");
+    E2E("AST_AoE_DPS: the pack's Earthly Star on the enemy too",
+        Target(aoeRules, "Earthly Star (a gathered pack, or on cooldown in boss fights)") == "enemy, self"
+        && Target(aoeRules, "Earthly Star (a gathered pack, or on cooldown in boss fights; where you stand)") == "self");
+    // A charged star goes off inside Divination when it would go off by itself in its last second or after it.
+    var inBurst = When(stRules, "Stellar Detonation (charged, before Divination runs out)");
+    E2E("AST_ST_DPS: Stellar Detonation inside Divination (optStarInBurst)", inBurst.Contains("optStarInBurst && ") && inBurst.Contains("buff(GiantDominance) && divUp && buffTime(GiantDominance) > buffTime(Buffs.Divination) - 1")
+        && inBurst.EndsWith("&& !eqHold") && AstDefines("AST_ST_DPS.json")["optStarInBurst"] == "1", inBurst);
+    // Dancing Mad Phase 3: the star is placed until 7 s after the second Decisive Battle (charged by the plan's pre-Accretion
+    // detonation at Earthquake + 5.2, Earthquake being 12.3 s after it); the top five placed theirs 0.8 s before to 4.1 s after.
+    var stDef = AstDefines("AST_ST_DPS.json");
+    E2E("AST_ST_DPS: Phase 3 star held from the second Decisive Battle + 7 s", stDef["starKeep"] == "zone == 1363 && castsSeen(TheDecisiveBattle) >= 2 && sinceCast(TheDecisiveBattle) >= 7 && castsSeen(Earthquake) == 0 || eqHold"
+        && 7 + 10 <= 12.26 + 5.2, stDef["starKeep"]);
+    // DMU_Mit_AST: no cast starts in the 1.5 s before the Ultima Repeaters' 1.4 s Collective Unconscious window (a cast from
+    // +2.8 s covered it in the fourth one's replay).
+    var planDef = AstDefines("DMU_Mit_AST.json");
+    E2E("DMU_Mit_AST: Ultima Repeater Collective Unconscious look-ahead", planDef["cuRepeaterSoon"].Contains("sinceCast(UltimaRepeater) >= 1.5 && sinceCast(UltimaRepeater) < 3")
+        && planDef["cuRepeater"].Contains("sinceCast(UltimaRepeater) >= 3 &&") && planDef["mitSoon"].Contains("|| cuRepeaterSoon && cd(CollectiveUnconscious) < 3)"), planDef["mitSoon"]);
+    // Earthquake: Microcosmos heals the last Accretion once the first removal's vulnerability (3372) is gone and 3.5 s have
+    // passed (four of the five removed the second so, 4.0-7.2 s after the first); never while two are up.
+    var planRules = AstRules("DMU_Mit_AST.json");
+    var lastAcc = planDef["microLastAcc"];
+    E2E("DMU_Mit_AST: Microcosmos for the last Accretion, safe from the first removal", lastAcc.Contains("buff(Buffs.Macrocosmos) && accretion && !accretions2 && partyWith(3372) == 0 && partyLost(1604) >= 3.5")
+        && Prop<string>(AR(planRules, "Earthquake: Microcosmos for the last Accretion"), "ActionName") == "Macrocosmos"
+        && planRules.FindIndex(r => Prop<string>(r, "Name") == "Earthquake: Microcosmos for the last Accretion") < planRules.FindIndex(r => Prop<string>(r, "Name") == "Sun Sign (plan, last chance)"), lastAcc);
+    // Earthquake's Macrocosmos from 2.6 s into the cast (its own heal at +17.6 or later, past that Microcosmos window; from 1 s
+    // it fell on the last holder 2.3 s after the first removal in one of the user's pulls), and no GCD from 1.1 s so its
+    // window (1.8 s, shorter than a GCD) is never covered; the hold is a Wait, not an instant Combust III (its GCD ran past it).
+    var hold = AR(planRules, "Hold the GCD (the Earthquake Macrocosmos is due)");
+    E2E("DMU_Mit_AST: Earthquake Macrocosmos from +2.6 s, the GCD held from +1.1 s", planDef["macroEq"].Contains("sinceCast(Earthquake) >= 2.6 && sinceCast(Earthquake) < 4.4")
+        && planDef["macroEqSoon"].Contains("sinceCast(Earthquake) >= 1.1 && sinceCast(Earthquake) < 2.6") && Prop<uint>(hold, "ActionId") == 1000004
+        && Prop<string>(hold, "WhenSource") == "macroEqSoon && !casting && remainingGcd < 0.6" && 2.6 + 15 >= 14.1 + 3.5, planDef["macroEq"]);    // Every level: no level gate, spells by their hooked base form.
     foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json", "AST_ST_Heal.json", "AST_AoE_Heal.json" })
     {
         var text = File.ReadAllText(Path.Combine(examples, f));

@@ -12,6 +12,7 @@ using WrathCombo.CustomRules;
 //   RuleSim calibrate <log> <pulls>                       movement threshold vs the user's real cast cancels
 //   RuleSim run <log> <pulls> [--rules=DIR] [--me=HEX]    sim vs actual, per pull and in total
 //   RuleSim timeline <log> <pull> [--from=s] [--to=s]     merged timeline: sim, actual, boss casts, raidwides
+//   RuleSim traces <log>... --out=DIR                     per-action response bundles as JSONL fixtures (TraceCommands.cs)
 // <pulls> = "27,30,34" or "27-49" or "sge" (every Dancing Mad pull where the user is on Sage).
 var cmd = args.Length > 0 ? args[0] : "help";
 string Opt(string name, string def) => args.FirstOrDefault(a => a.StartsWith($"--{name}=")) is { } a ? a[(name.Length + 3)..] : def;
@@ -127,6 +128,8 @@ Actual ActualOf(World w)
 string Cover(Func<string, bool> has) =>
     string.Join(" ", new[] { ("Kerachole", "Kera"), ("Holosakos", "Holos"), ("Panhaima", "Panh"), ("Eudaimonia", "Philo"), ("Physis II", "Phys"), ("Eukrasian Prognosis", "Shield") }
         .Where(x => has(x.Item1)).Select(x => x.Item2));
+
+if (TraceCommands.Handles(args)) return TraceCommands.Run(args);
 
 // Dancer: "run all|<log> dnc ..." / "timeline <log> <pull> dnc --me=HEX"; see DncCommands.cs.
 if (DncCommands.Handles(args)) return DncCommands.Main(args, registry, Index);

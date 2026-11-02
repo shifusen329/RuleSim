@@ -1,7 +1,11 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/RuleSim/RuleSim.csproj" />
+    <Project Path="src/RuleSim.Actions/RuleSim.Actions.csproj" />
     <Project Path="src/RuleHarness/RuleHarness.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RuleSim.Actions.Tests/RuleSim.Actions.Tests.csproj" />
   </Folder>
   <Folder Name="/legacy/">
     <Project Path="legacy/SamSim/SamSim.csproj" />

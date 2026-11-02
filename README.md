@@ -33,8 +33,11 @@ Movement is the main approximation. The log gives a position about once a second
 | --- | --- |
 | `src/RuleSim` | The replay. One executable; the job is picked by arguments (see the header of `Program.cs` and each `*Commands.cs`). `*_symbols.json` are generated from WrathCombo's job constants by `gen_symbols.py`. |
 | `src/RuleHarness` | The rule harness (unit and E2E checks over every rule file). |
+| `src/RuleSim.Actions` | Shared action resolution: what the server does when an actor uses an action (statuses spent and granted, job gauge, combo, targets). No dependencies; AnoMech references it to answer the player's and the bots' presses. Per-job coverage is in `docs/jobs`. |
+| `tests/RuleSim.Actions.Tests` | Its tests, including log traces of what the real server sent (`Traces/`, written by the `traces` command). `Data/actions.csv` is the player rows of the Action sheet. |
 | `legacy/SamSim` | The first Samurai simulator: fixed GCD, full uptime, no log. Superseded by `src/RuleSim/SamSim.cs`; kept for reference. |
 | `docs/results` | Tuning write-ups produced with the replay (Sage, Samurai, White Mage, Dancer). |
+| `docs/jobs` | How completely `RuleSim.Actions` resolves each job. |
 
 ## Requirements
 

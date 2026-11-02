@@ -45,6 +45,9 @@ Fn("if", [ParamKind.Number, ParamKind.Number, ParamKind.Number], 3, a =>
 Fn("boom", [], 0, _ => () => throw new InvalidOperationException("boom"));
 Fn("nameLen", [ParamKind.Name], 1, a => { var n = a[0].Name!; return () => n.Length; });
 Fn("gcd", [], 0, _ => () => 2.5);
+// As RuleBuiltins' (for the truth tables of rule files that use them).
+Fn("min", [ParamKind.Number, ParamKind.Number], 2, a => { Func<double> x = a[0].Value!, y = a[1].Value!; return () => Math.Min(x(), y()); });
+Fn("max", [ParamKind.Number, ParamKind.Number], 2, a => { Func<double> x = a[0].Value!, y = a[1].Value!; return () => Math.Max(x(), y()); });
 
 var deferredErrorChecks = new List<(string, string, string)>();
 void ErrorContainsLater(string name, string src, string expected) => deferredErrorChecks.Add((name, src, expected));
@@ -602,6 +605,32 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         && gd["otP5OpenHol"] == s8[0] && gd["otHol8"] == "otP5OpenHol || " + s8[1]
         && gd["otHol"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"otHol{k}")) && dd["sambaWhen"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"s{k}")),
         string.Join(", ", Enumerable.Range(1, 10).Where(k => k != 8 && gd.GetValueOrDefault($"otHol{k}") != dd[$"s{k}"]).Select(k => $"otHol{k}")));
+    // The user (2026-11-01): No Mercy is held with Bloodfest at the end of Phase 1 under optP1BurstHoldHp, and (held, or
+    // back after Phase 1's forced end at 198 s) until Phase 2's first 2-minute window, Forsaken + 13 s; meanwhile the
+    // rotation counts down to that release. Same defines in both files.
+    var holdNames = new[] { "p2Window", "p2Wait", "nmHold", "nmRelease", "nmCd" };
+    var gst = Defines("GNB_ST.json");
+    var gaoe = Defines("GNB_AoE.json");
+    E2E("GNB_ST / GNB_AoE: the same No Mercy hold defines", holdNames.All(n => gst[n] == gaoe[n]), string.Join(", ", holdNames.Where(n => gst.GetValueOrDefault(n) != gaoe.GetValueOrDefault(n))));
+    foreach (var f in new[] { "GNB_ST.json", "GNB_AoE.json" })
+    {
+        var rs = RuleList(Rules(f));
+        E2E($"{f}: No Mercy waits while nmHold (p1Ending || p2Wait); Bloodfest keys on the held countdown", Src(R(rs, "No Mercy")).Contains("&& !nmHold &&")
+            && Defines(f)["nmHold"] == "p1Ending || p2Wait" && Src(R(rs, "Bloodfest")).Contains("nmCd <= gcd + 1.0") && Defines(f)["p2Wait"].Contains("zone == 1363"));
+    }
+    // A truth table of the held countdown: the builtins it reads become plain values.
+    string Sub(string s) => s.Replace("cd(NoMercy)", "cdNm").Replace("castsSeen(Forsaken)", "fs").Replace("sinceCast(Forsaken)", "fsT")
+        .Replace("combatTime", "ct").Replace("zone == 1363", "dmu");
+    var holdEnv = new Dictionary<string, string> { ["optP1BurstHoldHp"] = "20", ["dmu"] = "1" };
+    foreach (var n in holdNames) holdEnv[n] = Sub(gst[n]);
+    double NmIn(double ct, double cdNm, int p1, int fs, double fsT) => Eval("nmCd", new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = $"{p1}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" });
+    double Held(double ct, double cdNm, int p1, int fs, double fsT) => Eval("nmHold", new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = $"{p1}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" });
+    E2E("GNB_ST: No Mercy held at 3:09 under the set % and at Phase 2's start, released at Forsaken + 13 s; not held at 3:07 over it",
+        Held(189, 0, 1, 0, 0) == 1 && Math.Abs(NmIn(189, 0, 1, 0, 0) - 52.8) < 0.01 && Held(208, 0, 0, 0, 0) == 1 && Math.Abs(NmIn(208, 0, 0, 0, 0) - 33.8) < 0.01
+        && Math.Abs(NmIn(235, 0, 0, 1, 9.5) - 3.5) < 0.01 && Held(242, 0, 0, 1, 13.1) == 0 && NmIn(242, 0, 0, 1, 13.1) == 0
+        && Held(187, 0, 0, 0, 0) == 0 && NmIn(187, 0, 0, 0, 0) == 0 && Held(150, 37, 0, 0, 0) == 0 && NmIn(150, 37, 0, 0, 0) == 37
+        && Held(400, 20, 0, 3, 5) == 0,
+        $"{NmIn(189, 0, 1, 0, 0)} {NmIn(208, 0, 0, 0, 0)} {NmIn(235, 0, 0, 1, 9.5)} {NmIn(242, 0, 0, 1, 13.1)}");
     E2E("DMU_Mit_GNB: the OT's last-chance Heart of Light is the Dancer's sambaLate (s2 whole), before the woven plan rule",
         gd["otHolLate"].Replace("otHol", "s") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
         && planRules.IndexOf(R(planRules, holLast)) == planRules.IndexOf(R(planRules, "Heart of Light (plan)")) - 1

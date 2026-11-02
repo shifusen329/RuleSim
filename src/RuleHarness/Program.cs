@@ -585,9 +585,27 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     E2E("DMU_Mit_GNB: every Nebula / Heart of Stone rule hooks; no alias ids (Great Nebula 36935, Heart of Corundum 25758)",
         planRules.Where(r => Id(r) is 16148 or 16161).All(r => Prop<bool>(r, "Hook")) && !planRules.Any(r => Id(r) is 36935 or 25758));
     E2E("DMU_Mit_GNB: Rampart (7531) and Camouflage (16140) on the busters", planRules.Count(r => Id(r) == 7531) == 2 && planRules.Count(r => Id(r) == 16140) == 2);
-    E2E("DMU_Mit_GNB: all woven except the Phase 5 Heart of Light, which needs no target (downtime) and the OT column",
-        planRules.Where(r => Prop<string>(r, "Name") != "Heart of Light (Phase 5, before Kefka is targetable)").All(r => Prop<bool>(r, "Weave"))
-        && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("!hasTarget") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("ot") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("optP5EarlyHol"));
+    var holLast = "Heart of Light (plan, last chance)";
+    E2E("DMU_Mit_GNB: all woven except the OT's Phase 5 Heart of Light (no target, downtime) and its last-chance Heart of Light",
+        planRules.Where(r => Prop<string>(r, "Name") is not ("Heart of Light (Phase 5, before Kefka is targetable)" or "Heart of Light (plan, last chance)")).All(r => Prop<bool>(r, "Weave"))
+        && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("!hasTarget") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("ot") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("optP5EarlyHol")
+        && Src(R(planRules, holLast)) == "optSheetMit && ot && otHolLate" && Id(R(planRules, holLast)) == 16160);
+    // The user (2026-11-01): as OT, Heart of Light follows the Dancer's Shield Samba (same 15 s, same 90 s cooldown):
+    // DMU_Mit_DNC's ten windows, and its last-chance press outside a weave window (s2 at once: no dance to wait for).
+    Dictionary<string, string> Defines(string file) => ((IEnumerable)Prop<object>(Rules(file), "Defines")).Cast<object>()
+        .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+    var gd = Defines("DMU_Mit_GNB.json");
+    var dd = Defines("DMU_Mit_DNC.json");
+    var s8 = dd["s8"].Split(" || ", 2);
+    E2E("DMU_Mit_GNB: the OT's Heart of Light windows are DMU_Mit_DNC's Shield Samba windows s1-s10",
+        Enumerable.Range(1, 10).Where(k => k != 8).All(k => gd[$"otHol{k}"] == dd[$"s{k}"])
+        && gd["otP5OpenHol"] == s8[0] && gd["otHol8"] == "otP5OpenHol || " + s8[1]
+        && gd["otHol"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"otHol{k}")) && dd["sambaWhen"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"s{k}")),
+        string.Join(", ", Enumerable.Range(1, 10).Where(k => k != 8 && gd.GetValueOrDefault($"otHol{k}") != dd[$"s{k}"]).Select(k => $"otHol{k}")));
+    E2E("DMU_Mit_GNB: the OT's last-chance Heart of Light is the Dancer's sambaLate (s2 whole), before the woven plan rule",
+        gd["otHolLate"].Replace("otHol", "s") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
+        && planRules.IndexOf(R(planRules, holLast)) == planRules.IndexOf(R(planRules, "Heart of Light (plan)")) - 1
+        && gd["holWhen"] == "optSheetMit && if(ot, otHol, mtHol)", gd.GetValueOrDefault("otHolLate") ?? "");
     E2E("DMU_Mit_GNB: no healing in the Accretions (Great Nebula, Heart of Corundum, Aurora)", planRules.Where(r => Id(r) is 16148 or 16161 or 16151).All(r => Src(r).Contains("!noHeal"))
         && planText.Contains("partyWith(1604)"));
     E2E("DMU_Mit_GNB: buster mitigation waits while Superbolide is up", planRules.Where(r => Id(r) is 16148 or 7531 or 16140 || Prop<string>(r, "Name") == "Heart of Corundum (buster)").All(r => Src(r).Contains("noBolide"))

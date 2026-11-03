@@ -12,3 +12,6 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   every action an Astrologian used, by the rules or pressed by hand, and for the manual ones the situation (enemies, the
   tank's / party's / lowest HP, target HP, your Combust's time left). What the user does by hand is what the rules miss;
   it set DUN_AST.json's thresholds (2026-11-03).
+- `install_when_closed.sh <staged plugin dir> <rules source dir> <backup dir> <hours> <rule file> [...]`: installs a staged
+  WrathCombo Debug build and rule files only once the game (ffxiv_dx11.exe) is closed, with backups; a plugin reload
+  under a running game crashed it (2026-11-03).

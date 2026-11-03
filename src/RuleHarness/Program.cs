@@ -706,12 +706,17 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         var rs = RuleList(Rules(h.File));
         var text = File.ReadAllText(Path.Combine(examples, h.File));
         var holdSrc = d.GetValueOrDefault(h.Hold) ?? "";
-        double HoldAt(int opt, int hasT, double hp) =>
-            Eval(holdSrc.Replace("hasTarget", "ht").Replace("targetHp", "thp"), new() { [h.Opt] = $"{opt}", ["ht"] = $"{hasT}", ["thp"] = $"{hp}" });
+        // Gunbreaker's (No Mercy and Bloodfest) holds on trash only, as holdBurst (the user, 2026-11-03); the rest in any fight.
+        var trash = h.File.StartsWith("GNB_");
+        var want = trash ? $"{h.Opt} > 0 && hasTarget && !boss && !bossEncounter && targetHp < {h.Opt}" : $"{h.Opt} > 0 && hasTarget && targetHp < {h.Opt}";
+        double HoldAt(int opt, int hasT, double hp, int boss = 0, int bossEnc = 0) =>
+            Eval(holdSrc.Replace("hasTarget", "ht").Replace("targetHp", "thp").Replace("bossEncounter", "be").Replace("!boss ", "!bs "),
+                new() { [h.Opt] = $"{opt}", ["ht"] = $"{hasT}", ["thp"] = $"{hp}", ["bs"] = $"{boss}", ["be"] = $"{bossEnc}" });
+        var bossesOk = trash ? HoldAt(20, 1, 15, boss: 1) == 0 && HoldAt(20, 1, 15, bossEnc: 1) == 0 : HoldAt(20, 1, 15, boss: 1, bossEnc: 1) == 1;
         var missing = h.Rules.Where(x => rs.All(r => Prop<string>(r, "Name") != x.Rule) || !Src(R(rs, x.Rule)).Contains(x.Has)).Select(x => x.Rule)
             .Concat(h.Defs.Where(x => !d.GetValueOrDefault(x.Define, "").Contains(x.Has)).Select(x => x.Define)).ToList();
-        E2E($"{h.File}: {h.Opt} (default 0, labelled) holds via {h.Hold} under the target's HP % with a target; off at 0",
-            d.GetValueOrDefault(h.Opt) == "0" && text.Contains($"\"{h.Opt}\": {{ \"label\": \"Hold ") && holdSrc == $"{h.Opt} > 0 && hasTarget && targetHp < {h.Opt}"
+        E2E($"{h.File}: {h.Opt} (default 0, labelled) holds via {h.Hold} under the target's HP % with a target{(trash ? ", on trash only" : ", bosses included")}; off at 0",
+            d.GetValueOrDefault(h.Opt) == "0" && text.Contains($"\"{h.Opt}\": {{ \"label\": \"Hold ") && holdSrc == want && bossesOk
             && HoldAt(20, 1, 15) == 1 && HoldAt(20, 1, 25) == 0 && HoldAt(20, 0, 0) == 0 && HoldAt(0, 1, 5) == 0 && missing.Count == 0,
             string.Join(", ", missing));
     }

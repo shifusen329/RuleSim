@@ -40,6 +40,8 @@ internal static class SharedBuiltins
         V(f, "zone", () => w.ZoneId);
         V(f, "bossEncounter", () => 1);
         V(f, "inDuty", () => 1);
+        // The replays are raids (Dancing Mad, Savage): never a dungeon, so a dungeon-only layer (DUN_AST.json) stands down.
+        V(f, "dungeon", () => 0);
     }
 
     /// <summary> The target, combat and raid buffs as the log shows them. </summary>

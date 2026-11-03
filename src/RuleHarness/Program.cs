@@ -757,7 +757,7 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
                 unmarked.Add($"{Path.GetFileName(f)}: {Prop<string>(o, "Name")}");
         }
     }
-    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 40,
+    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 45,
         $"{marked} marked; {string.Join(", ", unmarked)}");
 
     // The trash burst hold in every job's DPS files (the user, 2026-11-03: "Apply the hold 2min burst for trash to all
@@ -1129,7 +1129,7 @@ E2E("AST Custom Rules modes have no conflicts and run first", new[] { "AST_ST_Cu
                                 && V("AST_ST_CustomRules") > V("AST_ST_Simple_DPS") && V("AST_ST_CustomRules") > V("AST_ST_DPS") && V("AST_AoE_CustomRules") > V("AST_AOE_Simple_DPS") && V("AST_AoE_CustomRules") > V("AST_AOE_DPS")
                                 && V("AST_STHeal_CustomRules") > V("AST_Simple_ST_Heals") && V("AST_STHeal_CustomRules") > V("AST_ST_Heals") && V("AST_AoEHeal_CustomRules") > V("AST_Simple_AoE_Heals") && V("AST_AoEHeal_CustomRules") > V("AST_AoE_Heals"));
 E2E("UI order: AST Custom Rules between Simple and Advanced", Order("AST_Simple_AoE_Heals") < Order("AST_ST_CustomRules") && Order("AST_AoEHeal_CustomRules") < Order("AST_ST_DPS"));
-E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal", "AST_AoE_Heal", "DMU_Mit_AST" }.All(n => wrath.GetManifestResourceNames().Contains($"WrathCombo.CustomRules.Examples.{n}.json")));
+E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal", "AST_AoE_Heal", "DMU_Mit_AST", "DUN_AST" }.All(n => wrath.GetManifestResourceNames().Contains($"WrathCombo.CustomRules.Examples.{n}.json")));
 {
     var examples = Path.GetDirectoryName(Path.GetFullPath(samPath))!;
     List<object> AstRules(string f) => ((IEnumerable)Prop<object>(Prop<object>(Load(File.ReadAllText(Path.Combine(examples, f)), Path.Combine(examples, f)), "Set"), "Rules")).Cast<object>().ToList();
@@ -1191,6 +1191,25 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
     E2E("DMU_Mit_AST: Earthquake Macrocosmos from +2.6 s, the GCD held from +1.1 s", planDef["macroEq"].Contains("sinceCast(Earthquake) >= 2.6 && sinceCast(Earthquake) < 4.4")
         && planDef["macroEqSoon"].Contains("sinceCast(Earthquake) >= 1.1 && sinceCast(Earthquake) < 2.6") && Prop<uint>(hold, "ActionId") == 1000004
         && Prop<string>(hold, "WhenSource") == "macroEqSoon && !casting && remainingGcd < 0.6" && 2.6 + 15 >= 14.1 + 3.5, planDef["macroEq"]);    // Every level: no level gate, spells by their hooked base form.
+    // DUN_AST.json (2026-11-03): the dungeon layer on both DPS buttons, only where `dungeon` is 1 (never Dancing Mad, raids,
+    // trials or alliance raids); tank heals at the user's own hand-pressed thresholds, each behind its option, never on an
+    // invulnerable tank.
+    {
+        var dunPath = Path.Combine(examples, "DUN_AST.json");
+        var dunSet = Prop<object>(Load(File.ReadAllText(dunPath), dunPath), "Set");
+        var dunRules = AstRules("DUN_AST.json");
+        var dunDef = AstDefines("DUN_AST.json");
+        var replaces = ((IEnumerable<string>)dunSet.GetType().GetProperty("ReplacesNames")!.GetValue(dunSet)!).ToHashSet();
+        var invuln = new[] { "!82", "!409", "!810", "!811", "!3255", "!1836" };
+        var badRules = dunRules.Where(r => !Prop<string>(r, "WhenSource").Contains("tankUp") || !System.Text.RegularExpressions.Regex.IsMatch(Prop<string>(r, "WhenSource"), @"optDun\w+ > 0")
+            || r.GetType().GetProperty("TargetSource")!.GetValue(r) is string ts && !invuln.All(ts.Contains)).Select(r => Prop<string>(r, "Name")).ToList();
+        E2E("DUN_AST: a layer on both DPS buttons, only in dungeons; every rule behind its option, tank alive and not invulnerable",
+            Prop<bool>(dunSet, "Layer") && Prop<string>(dunSet, "WhenSource") == "dungeon && inCombat"
+            && new[] { "Malefic", "FallMalefic", "Gravity", "Gravity2" }.All(replaces.Contains) && dunRules.Count == 7 && badRules.Count == 0
+            && dunDef["optDunExaltationHp"] == "90" && dunDef["optDunIntersectionHp"] == "85" && dunDef["optDunDignityHp"] == "80"
+            && dunDef["optDunAoeHealHp"] == "65" && dunDef["optDunRegenHp"] == "80" && dunDef["tankUp"] == "tankHp > 0 && !tankInvuln",
+            string.Join(", ", badRules));
+    }
     foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json", "AST_ST_Heal.json", "AST_AoE_Heal.json" })
     {
         var text = File.ReadAllText(Path.Combine(examples, f));
@@ -1209,7 +1228,7 @@ foreach (var path in args.Skip(3))
         var targets = rules2.Where(r => r.GetType().GetProperty("TargetSource")!.GetValue(r) is not null).ToList();
         var isLayer = (bool)set2.GetType().GetProperty("Layer")!.GetValue(set2)!;
         E2E($"{Path.GetFileName(path)}: {rules2.Count} rules, {targets.Count} targeted, replaces {string.Join(",", (IEnumerable<string>)set2.GetType().GetProperty("ReplacesNames")!.GetValue(set2)!)}{(isLayer ? ", layer" : "")}", rules2.Count > 0);
-        if (Path.GetFileName(path).StartsWith("DMU_") || Path.GetFileName(path).StartsWith("Mit_"))
+        if (Path.GetFileName(path).StartsWith("DMU_") || Path.GetFileName(path).StartsWith("Mit_") || Path.GetFileName(path).StartsWith("DUN_"))
             E2E($"{Path.GetFileName(path)} is a layer", isLayer);
     }
 }

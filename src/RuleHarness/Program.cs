@@ -406,6 +406,22 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
         Prop<string>(moving, "Label") == "Tank shield only moving" && Prop<string>(moving, "Help").Contains("moving") && Prop<object?>(moving, "Choices") is null,
         $"({Prop<string>(moving, "Label")})");
 }
+// ---- Statuses the environment applies: buff() only sees statuses you applied ----
+{
+    // Accretion (1604), Earth Resistance Down II (3372) and Primordial Crust (5454) come from the environment (source E0000000),
+    // so buff(id) is false even while you have one; buffAny(id) sees them. With buff(1604) the Sage plan healed the other
+    // healer while the Sage's own Accretion ran out (2026-11-02 18:30, a wipe at Black Hole).
+    var examples = Path.GetDirectoryName(Path.GetFullPath(samPath))!;
+    var envBuff = new System.Text.RegularExpressions.Regex(@"(?<![A-Za-z])buff\((1604|3372|5454)\)");
+    var hits = Directory.GetFiles(examples, "*.json").Where(f => envBuff.IsMatch(File.ReadAllText(f))).Select(Path.GetFileName).ToList();
+    E2E("no rule file tests an environment status (Accretion, Earth Resistance Down II, Primordial Crust) with buff()", hits.Count == 0, string.Join(", ", hits));
+    // Sage: Krasis takes a press before the Accretion heal, so only with 3.4 s of the Accretion left, and on you only under 70%.
+    var sgePlan = File.ReadAllText(Path.Combine(examples, "DMU_Mit_SGE.json"));
+    E2E("DMU_Mit_SGE: Accretion Krasis only with time left for the heal",
+        sgePlan.Contains("\"accKrasis\": \"sinceCast(Earthquake) < 18.0 && (!buffAny(1604) || playerHp < 70)\"")
+        && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"action\": \"Krasis\"[^}]*accKrasis").Count == 3
+        && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"name\": \"Earthquake: Krasis").Count == 3);
+}
 var res = (System.Resources.ResourceManager)wrath.GetType("WrathCombo.Resources.Localization.Presets.CustomComboPresets", true)!
     .GetProperty("ResourceManager", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!.GetValue(null)!;
 E2E("UI name", res.GetString("SAM_ST_CustomRules_Name", System.Globalization.CultureInfo.InvariantCulture) == "Custom Rules - Single Target");

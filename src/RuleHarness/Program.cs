@@ -439,8 +439,28 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
                 : System.Text.RegularExpressions.Regex.IsMatch(m.Groups[3].Value, "^mouseover [^,]*!(3888|3890|3891|3892)");
             if (!ok) bad.Add($"{Path.GetFileName(f)}: {m.Groups[1].Value}");
         }
-    E2E("Astrologian cards: Play I on `card`, Play II and III on the hovered party member first", plays == 28 && bad.Count == 0,
+    E2E("Astrologian cards: Play I on `card`, Play II and III on the hovered party member first", plays == 30 && bad.Count == 0,
         $"{plays} card rules; {string.Join("; ", bad)}");
+
+    // Outside Dancing Mad the card cycle never stalls (the user, 2026-11-03: cards played by hand in dungeons; a draw waited
+    // 64 s behind a Balance held 118 s for a Divination that trash kept holding). Truth table of the two defines, with the
+    // builtins they read as plain values; and the rules that use them, in both DPS files.
+    foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json" })
+    {
+        var t = File.ReadAllText(Path.Combine(examples, f));
+        string Def(string n) => System.Text.RegularExpressions.Regex.Match(t, $"\"{n}\": \"([^\"]*)\"").Groups[1].Value;
+        string Sub(string s) => s.Replace("cd(AstralDraw)", "cdDraw").Replace("cd(Divination)", "cdDiv");
+        double PlayOne(int plan, int card, int divUp, double cdDraw, double cdDiv, int held) => Eval(Sub(Def("playOneNow")), new()
+            { ["planZone"] = $"{plan}", ["card1"] = $"{card}", ["divUp"] = $"{divUp}", ["cdDraw"] = $"{cdDraw}", ["cdDiv"] = $"{cdDiv}", ["holdDiv"] = $"{held}" });
+        double AtOnce(int opt, int plan, int bossEnc) => Eval(Def("cardsAtOnce"), new() { ["optCardsOnTrash"] = $"{opt}", ["planZone"] = $"{plan}", ["bossEncounter"] = $"{bossEnc}" });
+        E2E($"{f}: outside Dancing Mad the Play I card goes before the next draw when Divination is over 10 s off or held; utility cards at once on trash",
+            PlayOne(0, 1, 0, 1, 30, 0) == 1 && PlayOne(0, 1, 0, 1, 5, 0) == 0 && PlayOne(0, 1, 0, 1, 0, 1) == 1 && PlayOne(1, 1, 0, 1, 30, 0) == 0
+            && PlayOne(0, 1, 1, 1, 100, 0) == 0 && PlayOne(0, 1, 0, 20, 30, 0) == 0 && PlayOne(0, 0, 0, 1, 30, 0) == 0
+            && AtOnce(1, 0, 0) == 1 && AtOnce(1, 0, 1) == 0 && AtOnce(1, 1, 0) == 0 && AtOnce(0, 0, 0) == 0
+            && t.Contains("\"when\": \"(canWeave || gcdHeld) && inCombat && playOneNow\"") && Def("optCardsOnTrash") == "1"
+            && Def("lordNow").Contains("(cd(Divination) > 10 || !planZone && holdDiv)")
+            && System.Text.RegularExpressions.Regex.Matches(t, @"\|\| cardsAtOnce\)").Count == 4);
+    }
 }
 var res = (System.Resources.ResourceManager)wrath.GetType("WrathCombo.Resources.Localization.Presets.CustomComboPresets", true)!
     .GetProperty("ResourceManager", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!.GetValue(null)!;

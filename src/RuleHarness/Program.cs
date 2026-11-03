@@ -715,6 +715,25 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             && HoldAt(20, 1, 15) == 1 && HoldAt(20, 1, 25) == 0 && HoldAt(20, 0, 0) == 0 && HoldAt(0, 1, 5) == 0 && missing.Count == 0,
             string.Join(", ", missing));
     }
+
+    // A value option at 0 or 1 showed as a checkbox, with no way to type a % (the user, 2026-11-03): every option whose
+    // label reads as a value (an HP %, seconds, a minute, a count) and whose file value is 0 or 1 says "number": true.
+    var valueLabel = new System.Text.RegularExpressions.Regex(@"%|\(s\)|at minute|needed|kept for movement");
+    var unmarked = new List<string>();
+    var marked = 0;
+    foreach (var f in Directory.GetFiles(examples, "*.json"))
+    {
+        var loaded = Load(File.ReadAllText(f), f);
+        foreach (var o in ((IEnumerable?)loaded.GetType().GetProperty("Options")!.GetValue(loaded))?.Cast<object>() ?? [])
+        {
+            var number = Prop<bool>(o, "Number");
+            if (number) marked++;
+            if (Prop<string>(o, "FileValue") is "0" or "1" && valueLabel.IsMatch(Prop<string>(o, "Label")) && !number)
+                unmarked.Add($"{Path.GetFileName(f)}: {Prop<string>(o, "Name")}");
+        }
+    }
+    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 40,
+        $"{marked} marked; {string.Join(", ", unmarked)}");
     E2E("DMU_Mit_GNB: the OT's last-chance Heart of Light is the Dancer's sambaLate (s2 whole), before the woven plan rule",
         gd["otHolLate"].Replace("otHol", "s") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
         && planRules.IndexOf(R(planRules, holLast)) == planRules.IndexOf(R(planRules, "Heart of Light (plan)")) - 1

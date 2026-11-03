@@ -657,7 +657,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     // A truth table of the held countdown: the builtins it reads become plain values.
     string Sub(string s) => s.Replace("cd(NoMercy)", "cdNm").Replace("castsSeen(Forsaken)", "fs").Replace("sinceCast(Forsaken)", "fsT")
         .Replace("combatTime", "ct").Replace("zone == 1363", "dmu");
-    var holdEnv = new Dictionary<string, string> { ["optP1BurstHoldHp"] = "20", ["dmu"] = "1" };
+    // nmHpHold (optNoMercyHoldHp, 2026-11-03) is off here; its own check is with the other target-HP holds.
+    var holdEnv = new Dictionary<string, string> { ["optP1BurstHoldHp"] = "20", ["dmu"] = "1", ["nmHpHold"] = "0" };
     foreach (var n in holdNames) holdEnv[n] = Sub(gst[n]);
     double NmIn(double ct, double cdNm, int p1, int fs, double fsT) => Eval("nmCd", new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = $"{p1}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" });
     double Held(double ct, double cdNm, int p1, int fs, double fsT) => Eval("nmHold", new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = $"{p1}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" });
@@ -667,6 +668,53 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         && Held(187, 0, 0, 0, 0) == 0 && NmIn(187, 0, 0, 0, 0) == 0 && Held(150, 37, 0, 0, 0) == 0 && NmIn(150, 37, 0, 0, 0) == 37
         && Held(400, 20, 0, 3, 5) == 0,
         $"{NmIn(189, 0, 1, 0, 0)} {NmIn(208, 0, 0, 0, 0)} {NmIn(235, 0, 0, 1, 9.5)} {NmIn(242, 0, 0, 1, 13.1)}");
+    E2E("GNB_ST: a No Mercy held under optNoMercyHoldHp reads as far off (999)", NmIn(150, 0, 0, 0, 0) == 0
+        && Eval("nmCd", new(holdEnv) { ["ct"] = "150", ["cdNm"] = "0", ["p1Ending"] = "0", ["fs"] = "0", ["fsT"] = "0", ["nmHpHold"] = "1" }) == 999);
+
+    // ---- Per-cooldown "Hold ... under target HP %" options (the user, 2026-11-03): off (0) by default, any fight ----
+    // Each: the option (labelled, default 0), its hold define, the rules that must wait on it, and defines that must
+    // read it (what waited on the cooldown carries on).
+    (string File, string Opt, string Hold, (string Rule, string Has)[] Rules, (string Define, string Has)[] Defs)[] hpHolds =
+    [
+        ("PLD_ST.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold, 999, cd(FightOrFlight))")]),
+        ("PLD_AoE.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold, 999, cd(FightOrFlight))")]),
+        ("GNB_ST.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "!nmHpHold"), ("Bloodfest", "!nmHpHold")], [("nmCd", "if(nmHpHold, 999,")]),
+        ("GNB_AoE.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "!nmHpHold"), ("Bloodfest", "!nmHpHold")], [("nmCd", "if(nmHpHold, 999,")]),
+        ("RDM_ST.json", "optEmboldenHoldHp", "embHpHold", [("Embolden", "!embHpHold"), ("Manafication (between combos)", "cdE <= 5 && !embHpHold")], [("startCombo", "holdBurst || embHpHold")]),
+        ("RDM_ST.json", "optManaficationHoldHp", "manaHpHold", [("Manafication (between combos)", "!manaHpHold")], [("startCombo", "ready(Manafication) && !manaHpHold")]),
+        ("RDM_AoE.json", "optEmboldenHoldHp", "embHpHold", [("Embolden", "!embHpHold"), ("Manafication (between combos)", "cdE <= 5 && !embHpHold")], []),
+        ("RDM_AoE.json", "optManaficationHoldHp", "manaHpHold", [("Manafication (between combos)", "!manaHpHold")], []),
+        ("DNC_ST.json", "optTechHoldHp", "techHpHold", [("Technical Step", "!holdTech")], [("holdTech", "techHpHold")]),
+        ("DNC_ST.json", "optDevilmentHoldHp", "devHpHold", [("Devilment", "!devHpHold"), ("Hold the weave for Devilment", "!devHpHold")], []),
+        ("DNC_ST.json", "optFlourishHoldHp", "flHpHold", [("Flourish", "!flHpHold")], []),
+        ("DNC_AoE.json", "optTechHoldHp", "techHpHold", [("Technical Step", "!holdTech")], [("holdTech", "techHpHold")]),
+        ("DNC_AoE.json", "optDevilmentHoldHp", "devHpHold", [("Devilment", "!devHpHold"), ("Hold the weave for Devilment", "!devHpHold")], []),
+        ("DNC_AoE.json", "optFlourishHoldHp", "flHpHold", [("Flourish", "!flHpHold")], []),
+        ("WHM_ST_DPS.json", "optPomHoldHp", "pomHpHold", [("Presence of Mind", "!pomHpHold")], []),
+        ("RPR_ST.json", "optArcaneCircleHoldHp", "acHpHold", [("Arcane Circle", "!acHpHold")], [("acCd", "if(acHpHold, 999, cd(ArcaneCircle))"), ("shroudWanted", "acHpHold")]),
+        ("RPR_ST.json", "optEnshroudHoldHp", "enHpHold", [("Enshroud", "(host || shroudWanted && !p1Ending && !enHpHold")], []),
+        ("RPR_AoE.json", "optArcaneCircleHoldHp", "acHpHold", [("Arcane Circle", "!acHpHold")], [("acCd", "if(acHpHold, 999, cd(ArcaneCircle))"), ("shroudWanted", "acHpHold")]),
+        ("RPR_AoE.json", "optEnshroudHoldHp", "enHpHold", [("Enshroud", "(host || shroudWanted && !p1Ending && !enHpHold")], []),
+        ("WAR_ST.json", "optInnerReleaseHoldHp", "irHpHold", [("Inner Release", "!irHpHold")], [("irSoon", "!irHpHold")]),
+        ("WAR_AoE.json", "optInnerReleaseHoldHp", "irHpHold", [("Inner Release", "!irHpHold")], []),
+        ("AST_ST_DPS.json", "optDivinationHoldHp", "divHpHold", [("Lightspeed (burst)", "!holdDiv")], [("holdDiv", "holdBurst || divHpHold"), ("divNow", "!holdDiv"), ("lsSpendable", "|| holdDiv)")]),
+        ("AST_AoE_DPS.json", "optDivinationHoldHp", "divHpHold", [("Lightspeed (burst)", "!holdDiv")], [("holdDiv", "holdBurst || divHpHold"), ("divNow", "!holdDiv"), ("lsSpendable", "|| holdDiv)")]),
+    ];
+    foreach (var h in hpHolds)
+    {
+        var d = Defines(h.File);
+        var rs = RuleList(Rules(h.File));
+        var text = File.ReadAllText(Path.Combine(examples, h.File));
+        var holdSrc = d.GetValueOrDefault(h.Hold) ?? "";
+        double HoldAt(int opt, int hasT, double hp) =>
+            Eval(holdSrc.Replace("hasTarget", "ht").Replace("targetHp", "thp"), new() { [h.Opt] = $"{opt}", ["ht"] = $"{hasT}", ["thp"] = $"{hp}" });
+        var missing = h.Rules.Where(x => rs.All(r => Prop<string>(r, "Name") != x.Rule) || !Src(R(rs, x.Rule)).Contains(x.Has)).Select(x => x.Rule)
+            .Concat(h.Defs.Where(x => !d.GetValueOrDefault(x.Define, "").Contains(x.Has)).Select(x => x.Define)).ToList();
+        E2E($"{h.File}: {h.Opt} (default 0, labelled) holds via {h.Hold} under the target's HP % with a target; off at 0",
+            d.GetValueOrDefault(h.Opt) == "0" && text.Contains($"\"{h.Opt}\": {{ \"label\": \"Hold ") && holdSrc == $"{h.Opt} > 0 && hasTarget && targetHp < {h.Opt}"
+            && HoldAt(20, 1, 15) == 1 && HoldAt(20, 1, 25) == 0 && HoldAt(20, 0, 0) == 0 && HoldAt(0, 1, 5) == 0 && missing.Count == 0,
+            string.Join(", ", missing));
+    }
     E2E("DMU_Mit_GNB: the OT's last-chance Heart of Light is the Dancer's sambaLate (s2 whole), before the woven plan rule",
         gd["otHolLate"].Replace("otHol", "s") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
         && planRules.IndexOf(R(planRules, holLast)) == planRules.IndexOf(R(planRules, "Heart of Light (plan)")) - 1

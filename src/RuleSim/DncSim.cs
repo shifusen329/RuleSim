@@ -616,6 +616,8 @@ internal sealed class DncSim : IRuleRuntime
         F("debuff", St, 1, _ => () => 0);
         F("debuffTime", St, 1, _ => () => 0);
         F("debuffAny", St, 1, a => { var id = a[0].Id; return () => Target is { } t ? B(W.OthersHave(t, id, T)) : 0; });
+        // % of the living party with the status from anyone (DNC_ST / DNC_AoE's Accretion check before Curing Waltz).
+        F("partyWith", St, 1, a => { var id = a[0].Id; return () => { var l = W.Party.Where(p => !W.Dead(p, T)).ToList(); return l.Count == 0 ? 0 : 100.0 * l.Count(p => p.Id == W.Me.Id && Has(id) || W.OthersHave(p, id, T)) / l.Count; }; });
         F("debuffAnyTime", St, 1, a => { var id = a[0].Id; return () => Target is { } t ? W.OthersTime(t, id, T) : 0; });
         Val("gcd", () => GcdMs / 1000.0);
         Val("remainingGcd", () => Math.Max(0, GcdReadyAt - T) / 1000.0);

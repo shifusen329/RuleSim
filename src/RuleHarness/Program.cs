@@ -422,6 +422,26 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
         && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"action\": \"Krasis\"[^}]*accKrasis").Count == 3
         && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"name\": \"Earthquake: Krasis").Count == 3);
 }
+
+// ---- Astrologian cards: the party member under your mouse in the party list first ----
+{
+    // Play I uses `card` (Wrath's pick, with its Quick Target Cards override); Play II and III put `mouseover` first, with the
+    // card's own status filter, so a hover sends the card there (2026-11-03, the user's request).
+    var examples = Path.GetDirectoryName(Path.GetFullPath(samPath))!;
+    var bad = new List<string>();
+    var plays = 0;
+    foreach (var f in Directory.GetFiles(examples, "*.json").Where(f => Path.GetFileName(f) is var n && (n.StartsWith("AST_") || n == "DMU_Mit_AST.json")))
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(f), "\\{ \"name\": \"([^\"]*)\", \"action\": \"(Play[123])\"[^}]*?\"target\": \"([^\"]*)\""))
+        {
+            plays++;
+            var ok = m.Groups[2].Value == "Play1"
+                ? m.Groups[3].Value.StartsWith("card")
+                : System.Text.RegularExpressions.Regex.IsMatch(m.Groups[3].Value, "^mouseover [^,]*!(3888|3890|3891|3892)");
+            if (!ok) bad.Add($"{Path.GetFileName(f)}: {m.Groups[1].Value}");
+        }
+    E2E("Astrologian cards: Play I on `card`, Play II and III on the hovered party member first", plays == 28 && bad.Count == 0,
+        $"{plays} card rules; {string.Join("; ", bad)}");
+}
 var res = (System.Resources.ResourceManager)wrath.GetType("WrathCombo.Resources.Localization.Presets.CustomComboPresets", true)!
     .GetProperty("ResourceManager", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!.GetValue(null)!;
 E2E("UI name", res.GetString("SAM_ST_CustomRules_Name", System.Globalization.CultureInfo.InvariantCulture) == "Custom Rules - Single Target");

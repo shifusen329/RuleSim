@@ -676,8 +676,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     // read it (what waited on the cooldown carries on).
     (string File, string Opt, string Hold, (string Rule, string Has)[] Rules, (string Define, string Has)[] Defs)[] hpHolds =
     [
-        ("PLD_ST.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold, 999, cd(FightOrFlight))")]),
-        ("PLD_AoE.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold, 999, cd(FightOrFlight))")]),
+        ("PLD_ST.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, cd(FightOrFlight))")]),
+        ("PLD_AoE.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, cd(FightOrFlight))")]),
         ("GNB_ST.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "!nmHpHold"), ("Bloodfest", "!nmHpHold")], [("nmCd", "if(nmHpHold, 999,")]),
         ("GNB_AoE.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "!nmHpHold"), ("Bloodfest", "!nmHpHold")], [("nmCd", "if(nmHpHold, 999,")]),
         ("RDM_ST.json", "optEmboldenHoldHp", "embHpHold", [("Embolden", "!embHpHold"), ("Manafication (between combos)", "cdE <= 5 && !embHpHold")], [("startCombo", "holdBurst || embHpHold")]),
@@ -739,6 +739,24 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     }
     E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 40,
         $"{marked} marked; {string.Join(", ", unmarked)}");
+
+    // The trash burst hold in every job's DPS files (the user, 2026-11-03: "Apply the hold 2min burst for trash to all
+    // rulesets"; Paladin and Warrior got it then, for Fight or Flight and Inner Release). Sage has no burst cooldown; the
+    // heal files and the Dancing Mad plans press none.
+    var burstFiles = Directory.GetFiles(examples, "*.json").Select(Path.GetFileName).Where(n => n is not null
+        && System.Text.RegularExpressions.Regex.IsMatch(n, @"^(AST_(ST|AoE)_DPS|DNC_(ST|AoE)|GNB_(ST|AoE)|PLD_(ST|AoE)|RDM_(ST|AoE)|RPR_(ST|AoE)|SAM_\w+|WAR_(ST|AoE)|WHM_ST_DPS)\.json$")).Cast<string>().ToList();
+    var noTrash = burstFiles.Where(n =>
+    {
+        var d = Defines(n);
+        var text = File.ReadAllText(Path.Combine(examples, n));
+        return !(d.GetValueOrDefault("optBurstTrashHp") is { } v && double.TryParse(v, out var pct) && pct > 0 && text.Contains("\"optBurstTrashHp\": { \"label\": \"Hold ")
+            && d.GetValueOrDefault("holdBurst", "").Contains("!boss && !bossEncounter") && d.GetValueOrDefault("holdBurst", "").Contains("< optBurstTrashHp"));
+    }).ToList();
+    var pldWar = new[] { ("PLD_ST.json", "Fight or Flight"), ("PLD_AoE.json", "Fight or Flight"), ("WAR_ST.json", "Inner Release"), ("WAR_AoE.json", "Inner Release") };
+    E2E("every job's DPS files hold the burst on trash (optBurstTrashHp, labelled, on by default); Paladin's and Warrior's burst rules wait on it",
+        burstFiles.Count == 17 && noTrash.Count == 0 && pldWar.All(p => Src(R(RuleList(Rules(p.Item1)), p.Item2)).Contains("!holdBurst"))
+        && Defines("PLD_ST.json")["fofCd"].Contains("holdBurst") && Defines("WAR_ST.json")["irSoon"].Contains("!holdBurst"),
+        $"{burstFiles.Count} files; missing: {string.Join(", ", noTrash)}");
     E2E("DMU_Mit_GNB: the OT's last-chance Heart of Light is the Dancer's sambaLate (s2 whole), before the woven plan rule",
         gd["otHolLate"].Replace("otHol", "s") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
         && planRules.IndexOf(R(planRules, holLast)) == planRules.IndexOf(R(planRules, "Heart of Light (plan)")) - 1

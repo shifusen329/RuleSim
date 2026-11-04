@@ -2,6 +2,28 @@
 
 Notable changes to RuleSim. It has no versions; entries are by date.
 
+## 2026-11-03
+
+### Added
+
+- **`RuleSim downtime <log>... [--zone=1363] [--min=30] [--detail]`:** when the party had nothing to hit, for each pull, worked out three ways:
+  - **meter:** Raid Replay's live DPS meter (`TargetWatch`), run through the same indexer the plugin uses;
+  - **world:** this sim's "no target" rule (`World.Target`: no boss present, targetable and not hidden), from the loaded pull;
+  - **gaps:** stretches of 3 s or more with no party damage on an enemy, which both should match.
+
+  It lists every span for up to 3 pulls (or with `--detail`), then totals by phase, the gaps the meter didn't call downtime, and any meter downtime while the party was dealing damage.
+  - On the 10-05 clear (18:27) the gaps add up to 93.3 s, the meter to 91.4 s and the world rule to 48.2 s.
+  - Over the 92 Dancing Mad pulls of 09-27, 10-05 and 10-22, the meter called no downtime while the party was dealing damage, and covered 612 of the 688 s of gaps.
+- **RuleSim is a submodule of raid-replay** at `RuleSim/`. `Directory.Build.props` already finds Core in the parent repository there.
+
+### Known issues
+
+- **`World.Target` misses Dancing Mad downtime.**
+  - It misses the P2→P3 cutscene (46 s in the clear) and a moment in P3 at 12:03 with nothing targetable (5 s).
+  - It starts P4's Kefka Says downtime 6.8 s early.
+
+  The giant Kefka that spawns for the cutscene has no 34 line, so it counts as targetable, and the sims target it through the cutscene. P4's Kefka (base 18475), whom the party is hitting, is a helper in the pack, not a boss. Raid Replay's `TargetWatch` avoids both: an enemy counts only once the log shows it is targetable, through its name toggling on or a party hit. Not fixed here yet.
+
 ## 2026-11-02
 
 ### Added

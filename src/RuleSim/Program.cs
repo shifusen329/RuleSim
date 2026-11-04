@@ -131,6 +131,9 @@ string Cover(Func<string, bool> has) =>
 
 if (TraceCommands.Handles(args)) return TraceCommands.Run(args);
 
+// When the party had nothing to hit, per pull: the DPS meter vs this sim's World rule vs damage gaps; see DowntimeCommands.cs.
+if (DowntimeCommands.Handles(args)) return DowntimeCommands.Main(args, registry);
+
 // Dancer: "run all|<log> dnc ..." / "timeline <log> <pull> dnc --me=HEX"; see DncCommands.cs.
 if (DncCommands.Handles(args)) return DncCommands.Main(args, registry, Index);
 

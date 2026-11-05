@@ -929,6 +929,23 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
         new[] { "PLD_ST.json", "PLD_AoE.json", "DMU_Mit_PLD.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Prop<uint>(r, "ActionId")))));
     // Bulwark (22) on the tankbusters (the user's request, 2026-10-22): the DMU plan's busters and the marker elsewhere.
     E2E("DMU_Mit_PLD presses Bulwark on the busters", Prop<uint>(R(planRules, "Bulwark (buster)"), "ActionId") == 22);
+    // Interject and Low Blow on enemy casts (2026-11-05, user: "add it to all tank single target custom rules"): every tank
+    // single-target file, outside Dancing Mad, behind its option (on), aimed by the interrupt / stun target kinds; Low Blow
+    // only when Interject isn't taking the cast.
+    foreach (var f in new[] { "GNB_ST.json", "PLD_ST.json", "WAR_ST.json" })
+    {
+        var rs = RuleList(Rules(f));
+        var ij = R(rs, "Interject (an enemy's cast)"); var lb = R(rs, "Low Blow (a trash enemy's cast)");
+        string Tgt(object r) => r.GetType().GetProperty("TargetSource")!.GetValue(r)?.ToString() ?? "";
+        var fd = ((IEnumerable)Prop<object>(Rules(f), "Defines")).Cast<object>()
+            .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+        E2E($"{f}: Interject (interrupt target) and Low Blow (stun target) on enemy casts, outside Dancing Mad, woven, options on",
+            Prop<uint>(ij, "ActionId") == 7538 && Prop<uint>(lb, "ActionId") == 7540 && Tgt(ij) == "interrupt" && Tgt(lb) == "stun"
+            && Prop<bool>(ij, "Weave") && Prop<bool>(lb, "Weave")
+            && Prop<string>(ij, "WhenSource") == "optInterject && inCombat && zone != 1363 && interruptible"
+            && Prop<string>(lb, "WhenSource") == "optLowBlow && inCombat && zone != 1363 && stunnable && !(optInterject && interruptible && ready(Interject))"
+            && fd["optInterject"] == "1" && fd["optLowBlow"] == "1" && rs.IndexOf(ij) < rs.IndexOf(lb), $"{Tgt(ij)} {Tgt(lb)}");
+    }
     E2E("PLD_ST / PLD_AoE press Bulwark on the tankbuster marker",
         new[] { "PLD_ST.json", "PLD_AoE.json" }.All(f => RuleList(Rules(f)).Any(r => Prop<uint>(r, "ActionId") == 22 && Prop<string>(r, "Name") == "Bulwark (tankbuster marker)")));
     object Opt(object loaded, string name) => ((IEnumerable)Prop<object>(loaded, "Options")).Cast<object>().First(o => Prop<string>(o, "Name") == name);

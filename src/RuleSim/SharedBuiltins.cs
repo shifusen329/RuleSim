@@ -55,6 +55,9 @@ internal static class SharedBuiltins
         V(f, "ttk", () => 999);
         // The game's auto-target with nothing hostile targeted: the logged player always had the boss targeted when it mattered.
         V(f, "autoTarget", () => 0);
+        // Enemy casts to interrupt or stun (2026-11-05): no trash casters in the replays.
+        V(f, "interruptible", () => 0);
+        V(f, "stunnable", () => 0);
         V(f, "playerHp", () => w.HpPct(w.Me, now()));
         V(f, "boss", () => B(target()?.Kind == ActorKind.Boss));
         V(f, "raidBuffs", () => w.RaidBuffs(target(), now()).Count);

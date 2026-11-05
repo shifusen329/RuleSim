@@ -530,6 +530,32 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
     E2E("RDM_ST: at equal mana Verflare only with Verstone Ready and no Verfire Ready", Flare(30, 30, 1, 0) && !Flare(30, 30, 0, 0) && !Flare(30, 30, 0, 1) && !Flare(30, 30, 1, 1));
     E2E("RDM_ST: Verholy right after Verflare at three stacks", Index(st, "Verholy") == Index(st, "Verflare") + 1
         && Prop<string>(st[Index(st, "Verholy")], "WhenSource") == "stacks == 3");
+    // The standard opener (2026-11-05, user: "add the standard opener as an option"; The Balance's, as Wrath's Standard):
+    // off by default; step by step, Swiftcast after the Dualcast Verthunder, Fleche and Acceleration after the Swiftcast one,
+    // Embolden, Manafication, Contre Sixte and Engagement only after the Acceleration one, and never the last Acceleration
+    // charge before Embolden.
+    {
+        var sd = Defines("RDM_ST.json");
+        string Sub(string x) => x.Replace("ready(Swiftcast)", "rSwift").Replace("buff(Swiftcast)", "bSwift").Replace("buff(Acceleration)", "bAccel")
+            .Replace("charges(Acceleration)", "cAccel").Replace("ready(Embolden)", "rEmb").Replace("ready(Manafication)", "rMana");
+        string W(string name) => Sub(Prop<string>(st[Index(st, name)], "WhenSource"));
+        bool At(string expr, int rSwift, int bSwift, int bAccel, int cAccel, int instant) => Eval(expr, new()
+        {
+            ["optStandardOpener"] = "1", ["inCombat"] = "1", ["combatTime"] = "4", ["rEmb"] = "1", ["rMana"] = "1", ["hasTarget"] = "1",
+            ["rSwift"] = $"{rSwift}", ["bSwift"] = $"{bSwift}", ["bAccel"] = $"{bAccel}", ["cAccel"] = $"{cAccel}", ["instant"] = $"{instant}",
+            ["opening"] = Sub(sd["opening"]), ["openerPre"] = Sub(sd["openerPre"]),
+        }) == 1;
+        var pre = "openerPre"; var swift = W("Swiftcast (standard opener)"); var accel = W("Acceleration (standard opener)");
+        E2E("RDM_ST: the standard opener is an option, off by default", sd["optStandardOpener"] == "0"
+            && new[] { "Manafication (between combos)", "Embolden", "Contre Sixte", "Engagement" }.All(n => W(n).Contains("!openerPre")));
+        E2E("RDM_ST: standard opener order: Swiftcast, then Fleche and Acceleration, then Embolden and Manafication",
+            At(swift, 1, 0, 0, 2, 0) && !At(accel, 1, 0, 0, 2, 0) && At(pre, 1, 0, 0, 2, 0)          // after the Dualcast Verthunder
+            && !At(swift, 0, 1, 0, 2, 1) && !At(accel, 0, 1, 0, 2, 1) && At(pre, 0, 1, 0, 2, 1)      // Swiftcast up: Fleche waits too
+            && At(accel, 0, 0, 0, 2, 0) && At(pre, 0, 0, 0, 2, 0)                                     // after the Swiftcast Verthunder
+            && At(pre, 0, 0, 1, 1, 1)                                                                 // Acceleration up
+            && !At(pre, 0, 0, 0, 1, 0) && !At(accel, 0, 0, 0, 1, 0)                                   // after it: Embolden, the last charge kept
+            && W("Fleche").Contains("!(opening && bSwift)"));
+    }
     var aoe = RuleList(Rules("RDM_AoE.json"));
     E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"
         && Defines("RDM_AoE.json")["blackHigher"] == "black >= white");

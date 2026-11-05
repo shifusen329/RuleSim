@@ -1205,11 +1205,32 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
             || r.GetType().GetProperty("TargetSource")!.GetValue(r) is string ts && !invuln.All(ts.Contains)).Select(r => Prop<string>(r, "Name")).ToList();
         E2E("DUN_AST: a layer on both DPS buttons, only in dungeons; every rule behind its option, tank alive and not invulnerable",
             Prop<bool>(dunSet, "Layer") && Prop<string>(dunSet, "WhenSource") == "dungeon && inCombat"
-            && new[] { "Malefic", "FallMalefic", "Gravity", "Gravity2" }.All(replaces.Contains) && dunRules.Count == 7 && badRules.Count == 0
-            && dunDef["optDunExaltationHp"] == "90" && dunDef["optDunIntersectionHp"] == "85" && dunDef["optDunDignityHp"] == "80"
-            && dunDef["optDunAoeHealHp"] == "65" && dunDef["optDunRegenHp"] == "80" && dunDef["tankUp"] == "tankHp > 0 && !tankInvuln",
+            && new[] { "Malefic", "FallMalefic", "Gravity", "Gravity2" }.All(replaces.Contains) && dunRules.Count == 8 && badRules.Count == 0
+            && dunDef["optDunExaltationHp"] == "90" && dunDef["optDunIntersectionHp"] == "95" && dunDef["optDunDignityHp"] == "70"
+            && dunDef["optDunAoeHealHp"] == "65" && dunDef["optDunRegenHp"] == "80" && dunDef["optDunPullRegen"] == "1"
+            && dunDef["tankUp"] == "tankHp > 0 && !tankInvuln",
             string.Join(", ", badRules));
+        // 2026-11-04, from the top five Mistwake Astrologians (RuleSim scripts/ast_patterns.py): Intersection at 95, Dignity at
+        // 70, and Aspected Benefic on the tank in the first 5 s of combat.
+        var pull = AR(dunRules, "Aspected Benefic on the tank (pull start)");
+        E2E("DUN_AST: Aspected Benefic on the tank as a pull starts, no regen from you", Prop<string>(pull, "WhenSource")
+            == "optDunPullRegen > 0 && combatTime < 5 && tankUp && !tankHas(835) && !casting", Prop<string>(pull, "WhenSource"));
     }
+    // 2026-11-04, from the top five Mistwake Astrologians: outside Dancing Mad, Neutral Sect into a raidwide whatever the HP (for
+    // Sun Sign), Horoscope into a raidwide and read once the party is hurt, and trash Macrocosmos inside Divination.
+    foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json" })
+    {
+        var rs = AstRules(f);
+        var ns = Prop<string>(AR(rs, "Neutral Sect into a raidwide (for Sun Sign)"), "WhenSource");
+        var hs = Prop<string>(AR(rs, "Horoscope into a raidwide"), "WhenSource");
+        var hr = Prop<string>(AR(rs, "Horoscope (read after a raidwide)"), "WhenSource");
+        E2E($"{f}: Neutral Sect and Horoscope into raidwides, outside Dancing Mad, whatever the party's HP",
+            ns.Contains("!planZone") && ns.Contains("raidwideIn < 10") && !ns.Contains("partyAvgHp")
+            && hs.Contains("!planZone") && hs.Contains("raidwideIn < 10") && hs.Contains("hook(Horoscope) == id(Horoscope)")
+            && hr.Contains("!planZone") && hr.Contains("buff(Buffs.Horoscope)") && hr.Contains("partyAvgHp < optOppositionHp"), $"{ns} | {hs} | {hr}");
+    }
+    E2E("AST_AoE_DPS.json: trash Macrocosmos waits for Divination unless it is over 15 s off or held",
+        Prop<string>(AR(AstRules("AST_AoE_DPS.json"), "Macrocosmos (a pack)"), "WhenSource").EndsWith("&& (divUp || cd(Divination) > 15 || holdDiv)"));
     foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json", "AST_ST_Heal.json", "AST_AoE_Heal.json" })
     {
         var text = File.ReadAllText(Path.Combine(examples, f));

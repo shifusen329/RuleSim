@@ -27,3 +27,8 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   your zone visits in ACT logs (job, level, combat time, completed), dungeons told apart by the duty's director id
   (InstanceContent under 10000; trials are 20000+); --out cuts each listed run into its own log with its "Action pressed"
   lines, ready for ast_manual.py / ast_cards.py.
+- `ast_patterns.py <ACT log> [...] [--csv out.csv]`: how Astrologians play a run, in the rule files' terms: per action the
+  rate, boss/trash, seconds into the pull, enemies alive and near the target, pack HP, the target's HP, Divination up,
+  moving, and the next/last raidwide; the Malefic/Gravity split by enemies; Combust on trash. Reconciled the AST files with
+  the top five Mistwake Astrologians (2026-11-04).
+- `rules_dump.py <rule file> [...]`: a rule file's defines and rules in short form (name, action, target, when).

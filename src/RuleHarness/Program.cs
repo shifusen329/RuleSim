@@ -1015,6 +1015,35 @@ E2E("mouseover target kind", RuleTargets.TryParseKind("mouseover", out var mouse
     var stPath = Path.Combine(examples, "DNC_ST.json");
     var guide = withOptions.Invoke(null, [File.ReadAllText(stPath), stPath, new Dictionary<string, string> { ["optEspritHold"] = "80", ["optFeatherWindow"] = "0", ["optDmuOpener"] = "0" }])!;
     E2E("DNC_ST compiles with the guide's pooling (optEspritHold 80, optFeatherWindow 0) and optDmuOpener 0", Errors(guide).Count == 0, string.Join(" | ", Errors(guide)));
+    // The standard rotation (2026-11-05, user: "Add the DNC standard rotation as optional"): off by default; on, Saber
+    // Dance at 80, three feathers always kept, Tillana at 30 or less when the burst starts at 50 or more, no Finishing Move
+    // hold on Flourish; the opener stays optDmuOpener's (the guide's opener in Dancing Mad cost 15-19% of contribution).
+    {
+        var std = withOptions.Invoke(null, [File.ReadAllText(stPath), stPath, new Dictionary<string, string> { ["optStandardRotation"] = "1" }])!;
+        var stSet = Prop<object>(Load(File.ReadAllText(stPath), stPath), "Set");
+        var dd = ((IEnumerable)Prop<object>(stSet, "Defines")).Cast<object>()
+            .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+        var stRules = ((IEnumerable)Prop<object>(stSet, "Rules")).Cast<object>().ToList();
+        string Wn(string n) => Prop<string>(stRules.First(r => Prop<string>(r, "Name") == n), "WhenSource");
+        double Ev(string expr, int on, int esprit, double techLeft, int zone = 1363) => Eval(expr, new()
+        {
+            ["optStandardRotation"] = $"{on}", ["optEspritHold"] = dd["optEspritHold"], ["optFeatherWindow"] = dd["optFeatherWindow"],
+            ["optTillanaEsprit"] = dd["optTillanaEsprit"], ["optDmuOpener"] = dd["optDmuOpener"], ["zone"] = $"{zone}",
+            ["esprit"] = $"{esprit}", ["techLeft"] = $"{techLeft}",
+        });
+        E2E("DNC_ST: the standard rotation is an option, off by default, and compiles on", dd["optStandardRotation"] == "0" && Errors(std).Count == 0,
+            string.Join(" | ", Errors(std)));
+        E2E("DNC_ST: standard rotation: Saber Dance at 80, feathers always kept, no Flourish hold; the opener left to optDmuOpener",
+            Ev(dd["espritHold"], 1, 0, 0) == 80 && Ev(dd["espritHold"], 0, 0, 0) == 50
+            && Ev(dd["featherWindow"], 1, 0, 0) == 0 && Ev(dd["featherWindow"], 0, 0, 0) == 30
+            && Ev(dd["dmuOpener"], 1, 0, 0) == 1 && dd["dmuOpener"] == "optDmuOpener && zone == 1363"
+            && dd["flStdBlock"].StartsWith("!optStandardRotation && ")
+            && Wn("Saber Dance (Esprit)") == "esprit >= espritHold" && Wn("Fan Dance (feathers)").Contains("techIn < featherWindow || featherWindow == 0"));
+        E2E("DNC_ST: standard rotation Tillana: straight away under 50 Esprit as the burst starts, else at 30 or less",
+            Ev(dd["tillanaNow"], 1, 40, 18.5) == 1 && Ev(dd["tillanaNow"], 1, 60, 18.5) == 0 && Ev(dd["tillanaNow"], 1, 40, 12) == 0
+            && Ev(dd["tillanaNow"], 1, 30, 12) == 1 && Ev(dd["tillanaNow"], 0, 50, 12) == 1 && Ev(dd["tillanaNow"], 0, 60, 18.5) == 0
+            && Wn("Tillana").StartsWith("buff(FlourishingFinish) && (tillanaNow || "));
+    }
 }
 
 // ---- Warrior: two modes ----

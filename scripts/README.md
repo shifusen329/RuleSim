@@ -15,3 +15,6 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
 - `install_when_closed.sh <staged plugin dir> <rules source dir> <backup dir> <hours> <rule file> [...]`: installs a staged
   WrathCombo Debug build and rule files only once the game (ffxiv_dx11.exe) is closed, with backups; a plugin reload
   under a running game crashed it (2026-11-03).
+- `install_now.sh <staged plugin dir> <rules source dir> <backup dir> [rule file ...]`: when the user says "install",
+  installs a staged build right away, game running or not: backs up, copies WrathCombo.pdb then WrathCombo.dll, waits for
+  Dalamud's "Finished loading WrathCombo", then copies the rule files.

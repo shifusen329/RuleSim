@@ -897,6 +897,24 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
         Prop<bool>(R(stRules, "Holy Sheltron (Oath full)"), "Hook") && Prop<uint>(R(stRules, "Holy Sheltron (Oath full)"), "ActionId") == 3542
         && Prop<bool>(R(stRules, "Confiteor combo"), "Hook") && Prop<bool>(R(stRules, "Sepulchre (Fight or Flight)"), "Hook"));
     E2E("PLD_ST: Intervention targets the boss's target", R(stRules, "Intervention (Oath full, co-tank)").GetType().GetProperty("TargetSource")!.GetValue(R(stRules, "Intervention (Oath full, co-tank)"))?.ToString() == "targetsTarget");
+    // The standard opener (2026-11-05, user: "Add the standard opener as optional"; Icy Veins 7.55 / Wrath's Standard):
+    // off by default; Fight or Flight after Royal Authority whatever optOpenerEarlyFoF says, and no opener wait on the
+    // Confiteor combo (the two-minute raid-buff wait stays).
+    {
+        var pd = ((IEnumerable)Prop<object>(st, "Defines")).Cast<object>()
+            .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+        var fofOk = pd["fofOpenerOk"].Replace("justUsed(RoyalAuthority, 2.6)", "jr");
+        bool FofOk(int std, int early, double ct, int jr) => Eval(fofOk, new() { ["optStandardOpener"] = $"{std}", ["optOpenerEarlyFoF"] = $"{early}", ["combatTime"] = $"{ct}", ["jr"] = $"{jr}" }) == 1;
+        bool Hold(int std, double ct, double raidIn) => Eval(pd["holdConf"], new()
+        {
+            ["optConfInRaidBuffs"] = "1", ["optStandardOpener"] = $"{std}", ["fofUp"] = "1", ["inMelee"] = "1", ["raidBuffs"] = "0", ["combatTime"] = $"{ct}",
+            ["raidIn"] = $"{raidIn}", ["fofRoom"] = "19", ["confLeft"] = "4", ["goring"] = "1", ["gcd"] = "2.5",
+        }) == 1;
+        E2E("PLD_ST: the standard opener is an option, off by default; Fight or Flight after Royal Authority with it, whatever the early option",
+            pd["optStandardOpener"] == "0" && !FofOk(1, 1, 2, 0) && FofOk(1, 1, 7, 1) && FofOk(0, 1, 2, 0) && !FofOk(0, 0, 2, 0) && FofOk(1, 1, 13, 0));
+        E2E("PLD_ST: standard opener: the Confiteor combo goes at once in the opener; the two-minute raid-buff wait stays",
+            Hold(0, 7, 0) && !Hold(1, 7, 0) && Hold(1, 125, 3) && Hold(0, 125, 3));
+    }
     var planPath = Path.Combine(examples, "DMU_Mit_PLD.json");
     var planText = File.ReadAllText(planPath);
     var plan = Load(planText, planPath);

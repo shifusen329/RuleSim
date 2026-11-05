@@ -716,6 +716,25 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         $"{NmIn(189, 0, 1, 0, 0)} {NmIn(208, 0, 0, 0, 0)} {NmIn(235, 0, 0, 1, 9.5)} {NmIn(242, 0, 0, 1, 13.1)}");
     E2E("GNB_ST: a No Mercy held under optNoMercyHoldHp reads as far off (999)", NmIn(150, 0, 0, 0, 0) == 0
         && Eval("nmCd", new(holdEnv) { ["ct"] = "150", ["cdNm"] = "0", ["p1Ending"] = "0", ["fs"] = "0", ["fsT"] = "0", ["nmHpHold"] = "1" }) == 999);
+    // The standard opener (2026-11-05, user: "add the standard opener as optional"; Icy Veins 7.4 / Wrath's Normal opener):
+    // off by default; No Mercy after Brutal Shell whatever optOpenerEarlyNoMercy says, no Burst Strike before it, and in its
+    // window Gnashing Fang, Double Down, Sonic Break, then the Gnashing Fang combo; the second charge after the window.
+    {
+        var gr = RuleList(Rules("GNB_ST.json"));
+        int Ix(string n) => gr.FindIndex(r => Prop<string>(r, "Name") == n);
+        var ok = gst["nmOpenerOk"].Replace("justUsed(BrutalShell, 2.6)", "jb").Replace("combatTime", "ct");
+        bool NmOk(int std, int early, double ct, int jb) => Eval(ok, new() { ["optStandardOpener"] = $"{std}", ["optOpenerEarlyNoMercy"] = $"{early}", ["ct"] = $"{ct}", ["jb"] = $"{jb}" }) == 1;
+        E2E("GNB_ST: the standard opener is an option, off by default; No Mercy after Brutal Shell with it, whatever the early No Mercy option",
+            gst["optStandardOpener"] == "0" && !NmOk(1, 1, 1, 0) && NmOk(1, 1, 4.5, 1) && NmOk(0, 1, 1, 0) && !NmOk(0, 0, 1, 0) && NmOk(1, 1, 13, 0));
+        E2E("GNB_ST: standard opener window order: Gnashing Fang, Double Down, Sonic Break, the Gnashing Fang combo; no Burst Strike before No Mercy",
+            Ix("Gnashing Fang (standard opener: first in No Mercy)") >= 0 && Ix("Gnashing Fang (standard opener: first in No Mercy)") < Ix("Double Down")
+            && Ix("Double Down") < Ix("Sonic Break (standard opener: after Double Down)") && Ix("Sonic Break (standard opener: after Double Down)") < Ix("Savage Claw / Wicked Talon")
+            && Src(R(gr, "Gnashing Fang (standard opener: first in No Mercy)")).Contains("stdOpen && nmUp && gfReady && carts >= 3")
+            && Src(R(gr, "Sonic Break (standard opener: after Double Down)")).Contains("stdOpen && nmUp && canBreak && gfCombo && carts == 0")
+            && Src(R(gr, "Burst Strike before No Mercy")).StartsWith("!stdOpen && ")
+            && Src(R(gr, "Gnashing Fang (standard opener: after the window)")).StartsWith("stdOpen && !nmUp && gfReady && cd(NoMercy) > 30")
+            && Ix("Gnashing Fang (standard opener: after the window)") < Ix("Solid Barrel") && gst["stdOpen"] == "optStandardOpener && inCombat && combatTime < 40");
+    }
 
     // ---- Per-cooldown "Hold ... under target HP %" options (the user, 2026-11-03): off (0) by default, any fight ----
     // Each: the option (labelled, default 0), its hold define, the rules that must wait on it, and defines that must

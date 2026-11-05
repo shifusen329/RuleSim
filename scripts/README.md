@@ -23,3 +23,7 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   player and zone ("522:Mistwake" for a dungeon run, "553:Dancing Mad (Ultimate)" for DMU). FFLogs ranks dungeons by DPS,
   HPS or speed (no rDPS): `characterRankings(specName, metric: dps)` on the dungeon's encounter (Dawntrail expert
   dungeons: zone 57, Mistwake 4549, The Clyteum 4551).
+- `act_runs.py <ACT log> [...] [--from ISO] [--job AST] [--dungeon] [--last N] [--out DIR] [--dalamud dalamud.log ...]`:
+  your zone visits in ACT logs (job, level, combat time, completed), dungeons told apart by the duty's director id
+  (InstanceContent under 10000; trials are 20000+); --out cuts each listed run into its own log with its "Action pressed"
+  lines, ready for ast_manual.py / ast_cards.py.

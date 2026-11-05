@@ -26,7 +26,7 @@ RULE_BUTTONS = set(range(1000000, 1000004)) | {3596, 3598, 7442, 16555, 25871, 3
 DUNGEON_ZONES = None  # filled from the 01 lines' names when --zones dungeon (see is_dungeon)
 NOT_DUNGEON = re.compile(r'Syrcus Tower|Labyrinth of the Ancients|Crystal Tower|World of Darkness|Yak T.el|Kozama|Urqopacha|'
                          r'Shaaloani|Heritage Found|Living Memory|Tuliyollal|Solution Nine|Kobai Goten|Shirogane|Apartment|'
-                         r'Limsa|Gridania|Ul.dah|Mist|Lavender|Goblet|Empyreum|Dancing Mad', re.I)
+                         r'Limsa|Gridania|Ul.dah|Mist\b|Lavender|Goblet|Empyreum|Dancing Mad', re.I)
 
 
 def parse_time(s):

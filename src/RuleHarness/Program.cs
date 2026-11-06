@@ -1314,13 +1314,19 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
             || r.GetType().GetProperty("TargetSource")!.GetValue(r) is string ts && !invuln.All(ts.Contains)).Select(r => Prop<string>(r, "Name")).ToList();
         E2E("DUN_AST: a layer on both DPS buttons, only in dungeons; every rule behind its option, tank alive and not invulnerable",
             Prop<bool>(dunSet, "Layer") && Prop<string>(dunSet, "WhenSource") == "dungeon && inCombat"
-            && new[] { "Malefic", "FallMalefic", "Gravity", "Gravity2" }.All(replaces.Contains) && dunRules.Count == 8 && badRules.Count == 0
+            && new[] { "Malefic", "FallMalefic", "Gravity", "Gravity2" }.All(replaces.Contains) && dunRules.Count == 9 && badRules.Count == 0
             && dunDef["optDunExaltationHp"] == "90" && dunDef["optDunIntersectionHp"] == "95" && dunDef["optDunDignityHp"] == "70"
-            && dunDef["optDunAoeHealHp"] == "65" && dunDef["optDunRegenHp"] == "80" && dunDef["optDunPullRegen"] == "1"
+            && dunDef["optDunAoeHealHp"] == "65" && dunDef["optDunRegenHp"] == "80" && dunDef["optDunPullRegen"] == "1" && dunDef["optDunSynastry"] == "1"
             && dunDef["tankUp"] == "tankHp > 0 && !tankInvuln",
             string.Join(", ", badRules));
         // 2026-11-04, from the top five Mistwake Astrologians (RuleSim scripts/ast_patterns.py): Intersection at 95, Dignity at
         // 70, and Aspected Benefic on the tank in the first 5 s of combat.
+        // 2026-11-06: Synastry woven right before the hurt-tank Aspected Benefic (same HP line, no regen yet), never before the
+        // pull-start one.
+        var syn = AR(dunRules, "Synastry on the tank (its Aspected Benefic follows)");
+        E2E("DUN_AST: Synastry on the tank just before its hurt-tank Aspected Benefic", Prop<uint>(syn, "ActionId") == 3612
+            && dunRules.IndexOf(syn) + 1 == dunRules.IndexOf(AR(dunRules, "Aspected Benefic regen on the tank"))
+            && Prop<string>(syn, "WhenSource") == "(weave) && optDunSynastry > 0 && optDunRegenHp > 0 && tankUp && tankHp < optDunRegenHp && !tankHas(835) && !casting");
         var pull = AR(dunRules, "Aspected Benefic on the tank (pull start)");
         E2E("DUN_AST: Aspected Benefic on the tank as a pull starts, no regen from you", Prop<string>(pull, "WhenSource")
             == "optDunPullRegen > 0 && combatTime < 5 && tankUp && !tankHas(835) && !casting", Prop<string>(pull, "WhenSource"));

@@ -35,3 +35,5 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
 - `dmu_ue_hits.py <ACT log or folder> [...] [--since 20260915] [--mt-job WAR] [--invuln Holmgang] [--solo] [--csv out.csv]`: every
   Ultimate Embrace in Dancing Mad: who it was cast on, who it hit and for how much, invulnerabilities up at the hit, deaths, whether
   the other tank was alive, your job. `--solo` keeps hits that landed on one player.
+- `dmu_buster_mits.py <ACT log or folder> [...] --cast "Ultimate Embrace" --n 2 [--you-job WHM]`: what was on each tank when the Nth cast of a
+  Dancing Mad tankbuster landed: main tank and other tank, how long before or after the cast each was applied and by which job.

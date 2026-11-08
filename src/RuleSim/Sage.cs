@@ -266,9 +266,21 @@ internal sealed class SageSim : IRuleRuntime
             RuleTarget.TargetsTarget => TT is { } tt && Ok(tt) ? tt : null,
             RuleTarget.Self => Ok(W.Me) ? W.Me : null,
             RuleTarget.Raise => W.Party.FirstOrDefault(p => W.Dead(p, T)),
+            RuleTarget.CastTarget => CastTargetAt(spec.Cast ?? "", p => Ok(p)),
             _ => null,
         };
         return c;
+    }
+
+    /// <summary> The living party member the latest enemy cast of that name was aimed at (as WhmSim and AstSim). </summary>
+    private Actor? CastTargetAt(string cast, Func<Actor, bool> ok)
+    {
+        static string N(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        var casts = W.R.Casts.Where(c => c.StartMs <= T && c.Source.Kind is ActorKind.Boss or ActorKind.Enemy or ActorKind.Helper && N(c.Name) == cast).ToList();
+        if (casts.Count == 0) return null;
+        var last = casts.Max(c => c.StartMs);
+        var aimed = casts.Where(c => last - c.StartMs <= 1000 && c.Target is not null).Select(c => c.Target!.Id).ToHashSet();
+        return LivingParty().FirstOrDefault(p => aimed.Contains(p.Id) && ok(p));
     }
 
     // ---------------- the simulation step ----------------

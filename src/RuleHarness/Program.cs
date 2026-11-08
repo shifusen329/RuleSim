@@ -1346,6 +1346,19 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
     }
     // 2026-11-08: Ultimate Embrace's mitigation waits 0.6 s into the cast, as Revolting Ruin III's does (pressed 0.1-0.2 s in,
     // Aquaveil went to the White Mage: 3 of the 6 first Ultimate Embraces on 2026-10-29).
+    // The Sage's first four tankbusters (2026-11-08, user): Taurochole between Revolting Ruin III #1's hits and after Hyperdrive #1's
+    // first hit; nothing spent on Revolting Ruin III #2 or Hyperdrive #2 (invulnerabilities).
+    {
+        var sg = AstDefines("SGE_ST_DPS.json"); var sr = AstRules("SGE_ST_DPS.json");
+        string Sw(string n) => Prop<string>(AR(sr, n), "WhenSource");
+        E2E("SGE_ST_DPS: Taurochole between Revolting Ruin III #1's hits, after Hyperdrive #1's first; not on Revolting Ruin III #2",
+            sg["busterRuin"].Contains("castsSeen(RevoltingRuinIII) == 1") && sg["busterOnTt"].Contains("!ruin2Now")
+            && sg["ruin1Tauro"].Contains("sinceCast(RevoltingRuinIII) >= 5.5 && sinceCast(RevoltingRuinIII) < 7.5") && sg["hd1Tauro"].Contains("sinceCast(LightOfJudgment) >= 8.5 && sinceCast(LightOfJudgment) < 11.6")
+            && Sw("Taurochole on Revolting Ruin III's tank (between the first cast's hits)").StartsWith("ruin1Tauro && gall >= 1")
+            && Sw("Taurochole on Hyperdrive's tank (the first, after its first hit)").StartsWith("hd1Tauro && gall >= 1")
+            && Sw("Taurochole on the boss's target before a tankbuster").Contains("!ruin1Now")
+            && !sr.Any(r => Prop<string>(r, "Name") == "Taurochole on Revolting Ruin III's tank"));
+    }
     E2E("DMU_Mit_WHM / DMU_Mit_AST: Ultimate Embrace's tank mitigation not before 0.6 s into the cast",
         new[] { "DMU_Mit_WHM.json", "DMU_Mit_AST.json" }.All(f => AstDefines(f)["ueBusters"] == "enemyCast(UltimateEmbrace) && enemyCastIn(UltimateEmbrace) > 0.2 && sinceCast(UltimateEmbrace) >= 0.6"));
     E2E("AST_AoE_DPS.json: trash Macrocosmos waits for Divination unless it is over 15 s off or held",

@@ -161,20 +161,27 @@ def main():
         eff = [(t[3], min(t[3], max(0, t[5] - t[4])), t[5]) for t in t0 if t[5]]
         print('  heal (raw) as % of max HP:', q([pct(r, m) for r, _, m in eff], lambda x: f'{x:.0f}'), '| what the tank could take (effective, by its HP when it landed):',
               q([pct(e, m) for _, e, m in eff], lambda x: f'{x:.0f}'), f"| overheal {100 * (1 - sum(e for _, e, _ in eff) / max(1, sum(r for r, _, _ in eff))):.0f}%")
-    ws = collections.Counter()
+    # The rule's press on the logged GCDs: the first moment from 5.5 s with a weave slot (not casting, 0.6 s or more to the next GCD),
+    # or, not casting, when waiting out the next cast would land after 7.5 s (a small clip of the next GCD).
+    ws, clips = collections.Counter(), []
     for c in pulls:
-        lo, hi = c['hits'][0][0] + 0.4, c['hits'][1][0] - 0.7   # after hit 1 has applied; early enough for the 10% to be on hit 2
-        busy = sorted((g[0], g[0] + max(g[2], 0.6)) for g in c['gcds'])
-        edge, best = lo, 0.0
-        for s, e in busy:                                        # the longest stretch inside the window with no cast or GCD animation
-            if s > edge:
-                best = max(best, min(s, hi) - edge)
-            edge = max(edge, e)
-            if edge >= hi:
-                break
-        best = max(best, hi - edge)
-        ws['a slot of 0.6 s or more' if best >= 0.6 else 'a shorter slot (a press clips the next GCD a little)' if best > 0.05 else 'none'] += 1
-    print(f"\npress window {c['hits'][0][0] + 0.4:.1f} to {c['hits'][1][0] - 0.7:.1f} s after the cast starts:", dict(ws))
+        cast = sorted((g[0], g[0] + max(g[2], 0.6)) for g in c['gcds'])
+        res = None
+        t = 5.5
+        while t < 7.5 and res is None:
+            if not any(s_ <= t < e_ for s_, e_ in cast):
+                nxt = min([s_ for s_, _ in cast if s_ > t] or [t + 2.5])
+                rem = nxt - t
+                if rem >= 0.6:
+                    res = ('a clean weave slot', 0.0)
+                elif t + rem + 1.5 > 7.5:
+                    res = ('a small clip of the next GCD', 0.6 - rem)
+            t += 0.05
+        res = res or ('no press possible in the window', 0.0)
+        ws[res[0]] += 1
+        if res[1]:
+            clips.append(res[1])
+    print('\nThe between-the-hits press, on the logged GCDs:', dict(ws), '| clip when there is one, s:', q(clips))
     if a.detail:
         print()
         for c in pulls[-a.detail:]:

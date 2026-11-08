@@ -37,3 +37,5 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   the other tank was alive, your job. `--solo` keeps hits that landed on one player.
 - `dmu_buster_mits.py <ACT log or folder> [...] --cast "Ultimate Embrace" --n 2 [--you-job WHM]`: what was on each tank when the Nth cast of a
   Dancing Mad tankbuster landed: main tank and other tank, how long before or after the cast each was applied and by which job.
+- `dmu_rr3_sge.py <ACT log or folder> [...] [--since 20261023] [--detail N]`: the first Revolting Ruin III as a Sage plays it: when its two hits land, how much
+  they do, the tank's HP (from the real HP updates), when Taurochole went out and its overheal, and an estimate of landing it between the hits.

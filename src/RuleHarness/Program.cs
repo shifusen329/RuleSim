@@ -1344,6 +1344,10 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
             && hs.Contains("!planZone") && hs.Contains("raidwideIn < 10") && hs.Contains("hook(Horoscope) == id(Horoscope)")
             && hr.Contains("!planZone") && hr.Contains("buff(Buffs.Horoscope)") && hr.Contains("partyAvgHp < optOppositionHp"), $"{ns} | {hs} | {hr}");
     }
+    // 2026-11-08: Ultimate Embrace's mitigation waits 0.6 s into the cast, as Revolting Ruin III's does (pressed 0.1-0.2 s in,
+    // Aquaveil went to the White Mage: 3 of the 6 first Ultimate Embraces on 2026-10-29).
+    E2E("DMU_Mit_WHM / DMU_Mit_AST: Ultimate Embrace's tank mitigation not before 0.6 s into the cast",
+        new[] { "DMU_Mit_WHM.json", "DMU_Mit_AST.json" }.All(f => AstDefines(f)["ueBusters"] == "enemyCast(UltimateEmbrace) && enemyCastIn(UltimateEmbrace) > 0.2 && sinceCast(UltimateEmbrace) >= 0.6"));
     E2E("AST_AoE_DPS.json: trash Macrocosmos waits for Divination unless it is over 15 s off or held",
         Prop<string>(AR(AstRules("AST_AoE_DPS.json"), "Macrocosmos (a pack)"), "WhenSource").EndsWith("&& (divUp || cd(Divination) > 15 || holdDiv)"));
     foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json", "AST_ST_Heal.json", "AST_AoE_Heal.json" })

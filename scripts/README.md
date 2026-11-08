@@ -32,3 +32,6 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   moving, and the next/last raidwide; the Malefic/Gravity split by enemies; Combust on trash. Reconciled the AST files with
   the top five Mistwake Astrologians (2026-11-04).
 - `rules_dump.py <rule file> [...]`: a rule file's defines and rules in short form (name, action, target, when).
+- `dmu_ue_hits.py <ACT log or folder> [...] [--since 20260915] [--mt-job WAR] [--invuln Holmgang] [--solo] [--csv out.csv]`: every
+  Ultimate Embrace in Dancing Mad: who it was cast on, who it hit and for how much, invulnerabilities up at the hit, deaths, whether
+  the other tank was alive, your job. `--solo` keeps hits that landed on one player.

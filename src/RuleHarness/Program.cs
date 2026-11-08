@@ -1359,6 +1359,16 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
             && Sw("Taurochole on the boss's target before a tankbuster").Contains("!ruin1Now")
             && !sr.Any(r => Prop<string>(r, "Name") == "Taurochole on Revolting Ruin III's tank"));
     }
+    // The White Mage and Astrologian plans follow the same four-buster assignment (2026-11-08): Revolting Ruin III #1 and Hyperdrive #1.
+    foreach (var f in new[] { "DMU_Mit_WHM.json", "DMU_Mit_AST.json" })
+    {
+        var pl = AstDefines(f);
+        E2E($"{f}: tank mitigation on Revolting Ruin III #1 and Hyperdrive #1 only (the second of each is an invulnerability)",
+            pl["rr3Veil"].Contains("castsSeen(RevoltingRuinIII) == 1") && pl["rr3Benison"].StartsWith("castsSeen(RevoltingRuinIII) == 1 &&")
+            && pl["hyperdrive"].StartsWith("castsSeen(LightOfJudgment) == 1 &&"));
+    }
+    E2E("DMU_Mit_WHM: the Hyperdrive #1 option is gone (always on)", !AstDefines("DMU_Mit_WHM.json").ContainsKey("optHyperdrive1Benison"));
+    E2E("DMU_Mit_AST: The Bole also on Hyperdrive #1", Prop<string>(AR(AstRules("DMU_Mit_AST.json"), "The Bole (Hyperdrive, Wings, Thunder III, Maddening Orchestra)"), "WhenSource").Contains("(hyperdrive || wingsVeil"));
     E2E("DMU_Mit_WHM / DMU_Mit_AST: Ultimate Embrace's tank mitigation not before 0.6 s into the cast",
         new[] { "DMU_Mit_WHM.json", "DMU_Mit_AST.json" }.All(f => AstDefines(f)["ueBusters"] == "enemyCast(UltimateEmbrace) && enemyCastIn(UltimateEmbrace) > 0.2 && sinceCast(UltimateEmbrace) >= 0.6"));
     E2E("AST_AoE_DPS.json: trash Macrocosmos waits for Divination unless it is over 15 s off or held",

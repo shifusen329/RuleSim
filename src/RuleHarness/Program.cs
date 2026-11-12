@@ -418,9 +418,48 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
     // Sage: Krasis takes a press before the Accretion heal, so only with 3.4 s of the Accretion left, and on you only under 70%.
     var sgePlan = File.ReadAllText(Path.Combine(examples, "DMU_Mit_SGE.json"));
     E2E("DMU_Mit_SGE: Accretion Krasis only with time left for the heal",
-        sgePlan.Contains("\"accKrasis\": \"sinceCast(Earthquake) < 18.0 && (!buffAny(1604) || playerHp < 70)\"")
-        && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"action\": \"Krasis\"[^}]*accKrasis").Count == 3
-        && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"name\": \"Earthquake: Krasis").Count == 3);
+        sgePlan.Contains("\"accKrasis1\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3004)) || playerHp < 70)\"")
+        && sgePlan.Contains("\"accKrasis2\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3005)) || playerHp < 70)\"")
+        && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"action\": \"Krasis\"[^}]*accKrasis[12]").Count == 2
+        && System.Text.RegularExpressions.Regex.Matches(sgePlan, "\"name\": \"Earthquake: Krasis on (First|Second) in Line").Count == 2);
+    // Phase 3 Earthquake (2026-11-11, the user: "heal the accretion from the highest line order player, ensure that no one has
+    // the earth crystal vulnerability then heal other accretion while keeping the tanks alive"): the three healer plans take
+    // the Accretions one at a time in line order (First in Line's first by default), each only with nothing still to pulse
+    // (no Earth Resistance Down II, no Accretion off or Crust broken in 3.2 s), the party able to take the pulse and the tanks
+    // over the Crust line; a tank holding a Crust under that line gets single-target heals; AoE heals never fill a holder.
+    foreach (var (planFile, heals) in new[] { ("DMU_Mit_SGE.json", 4), ("DMU_Mit_WHM.json", 4), ("DMU_Mit_AST.json", 3) })
+    {
+        var plan = File.ReadAllText(Path.Combine(examples, planFile));
+        var rx = System.Text.RegularExpressions.Regex.Matches(plan, "[{] \"name\": \"Earthquake: [^\"]* on (First|Second) in Line's Accretion\"[^}]*[}]").Select(m => m.Value).ToList();
+        var first = rx.Where(r => r.Contains("in Line's Accretion\", ") && r.Contains("First in Line")).ToList();
+        var second = rx.Where(r => r.Contains("Second in Line")).ToList();
+        E2E($"{planFile}: Accretions in line order, one at a time, safe from the pulse",
+            first.Count == heals && second.Count == heals
+            && first.All(r => r.Contains("\"target\": \"self 1604 3004, healer 1604 3004, dps 1604 3004\"") && r.Contains("\"when\": \"accDo1"))
+            && second.All(r => r.Contains("\"target\": \"self 1604 3005, healer 1604 3005, dps 1604 3005\"") && r.Contains("\"when\": \"accDo2"))
+            && plan.Contains("\"accQuiet\": \"partyWith(3372) == 0 && partyLost(1604) >= 3.2 && partyLost(5454) >= 3.2\"")
+            && plan.Contains("\"accGo\": \"accretion && accQuiet && (accPartySafe && accTanksSafe || accLate)\"")
+            && plan.Contains("\"accPartySafe\": \"partyBelowShielded(optAccSafeHp, 1604) == 0\"")
+            && plan.Contains("\"accDo1\": \"accGo && acc1Up && (optAccFirstLine != 2 || !acc2Up)")
+            && plan.Contains("\"accDo2\": \"accGo && acc2Up && (optAccFirstLine == 2 || !acc1Up)")
+            && plan.Contains("\"optAccFirstLine\": \"1\"") && plan.Contains("\"optAccSafeHp\": \"45\"") && plan.Contains("\"optCrustTankHp\": \"60\"")
+            && plan.Contains("\"optAccTankHp\": \"45\"") && plan.Contains("\"accTanksSafe\": \"optAccTankHp <= 0 || tankHp >= optAccTankHp\"")
+            && !plan.Contains("accFirst") && !plan.Contains("accSecond") && !plan.Contains("accPartyLow"),
+            $"{first.Count}/{second.Count}");
+        var tankRules = System.Text.RegularExpressions.Regex.Matches(plan, "[{] \"name\": \"Earthquake: [^\"]* on a tank under the Crust line[^\"]*\"[^}]*[}]").Select(m => m.Value).ToList();
+        E2E($"{planFile}: tanks kept over the Crust line, never on an Accretion holder",
+            tankRules.Count >= 4 && tankRules.All(r => r.Contains("crustTank") && (!r.Contains("\"target\"") || r.Contains("\"target\": \"tank 5454")))
+            && plan.Contains("\"crustTank\": \"zone == 1363 && optCrustTankHp > 0 && castsSeen(Earthquake) == 1 && sinceCast(Earthquake) >= 7 && tankHas(5454) && tankHp < optCrustTankHp\""),
+            tankRules.Count.ToString());
+        var topUp = System.Text.RegularExpressions.Regex.Matches(plan, "[{] \"name\": \"Earthquake: [^\"]* before an Accretion[^\"]*\"[^}]*[}]").Select(m => m.Value).ToList();
+        E2E($"{planFile}: before an Accretion, a party heal only when it can't fill a holder; single heals on non-holders",
+            topUp.Count >= 4 && topUp.All(r => r.Contains("accTopUp") && (r.Contains("\"target\": \"lowest !1604") || r.Contains("accNoFill"))),
+            topUp.Count.ToString());
+    }
+    // The heal buttons hold an Accretion holder's heal while a pulse is still to come: after an Accretion or a broken Crust.
+    var popped = new[] { "SGE_ST_Heal.json", "SGE_AoE_Heal.json", "WHM_AoE_Heal.json", "AST_ST_Heal.json", "AST_AoE_Heal.json" }
+        .Where(f => !File.ReadAllText(Path.Combine(examples, f)).Contains("\"accretionPopped\": \"accretion && (partyLost(1604) < 3.2 || partyLost(5454) < 3.2)\"")).ToList();
+    E2E("heal buttons: the Accretion hold covers a broken Primordial Crust too", popped.Count == 0, string.Join(", ", popped));
 }
 
 // ---- Astrologian cards: the party member under your mouse in the party list first ----
@@ -492,7 +531,7 @@ E2E("SGE gauge fields", sgeGauge.Contains("Addersgall") && sgeGauge.Contains("Ad
 
 var builtins = wrath.GetType("WrathCombo.CustomRules.RuleBuiltins", true)!.GetMethod("Create")!.Invoke(null, [24283u])!;
 var fnNames = ((IEnumerable)builtins.GetType().GetProperty("Keys")!.GetValue(builtins)!).Cast<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
-E2E("heal/party/raidwide functions registered", new[] { "partyAvgHp", "partyLowestHp", "partyBelow", "partyWith", "healHp", "healIsTank", "healHas", "tankHp", "tankHas", "ttIsParty", "ttIsTank", "ttIsSelf", "ttHp", "ttHas", "raidwide", "raidwideIn", "stackMarker", "tankbuster", "mp", "canRaise", "canEsuna" }.All(fnNames.Contains));
+E2E("heal/party/raidwide functions registered", new[] { "partyAvgHp", "partyLowestHp", "partyBelow", "partyWith", "healHp", "healIsTank", "healHas", "tankHp", "tankHas", "ttIsParty", "ttIsTank", "ttIsSelf", "ttHp", "ttHas", "raidwide", "raidwideIn", "stackMarker", "tankbuster", "mp", "canRaise", "canEsuna", "hpWith", "partyBelowShielded" }.All(fnNames.Contains));
 
 // ---- Red Mage: two modes ----
 foreach (var (m, id, aoe, buttons) in new[] { ("RDM_ST_CustomRules", 13030, false, new uint[] { 7503, 7524, 37004 }), ("RDM_AoE_CustomRules", 13230, true, new uint[] { 7509, 16526 }) })
@@ -802,7 +841,7 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
                 unmarked.Add($"{Path.GetFileName(f)}: {Prop<string>(o, "Name")}");
         }
     }
-    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 45,
+    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 48,
         $"{marked} marked; {string.Join(", ", unmarked)}");
 
     // The trash burst hold in every job's DPS files (the user, 2026-11-03: "Apply the hold 2min burst for trash to all
@@ -1290,7 +1329,7 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
     // passed (four of the five removed the second so, 4.0-7.2 s after the first); never while two are up.
     var planRules = AstRules("DMU_Mit_AST.json");
     var lastAcc = planDef["microLastAcc"];
-    E2E("DMU_Mit_AST: Microcosmos for the last Accretion, safe from the first removal", lastAcc.Contains("buff(Buffs.Macrocosmos) && accretion && !accretions2 && partyWith(3372) == 0 && partyLost(1604) >= 3.5")
+    E2E("DMU_Mit_AST: Microcosmos for the last Accretion, safe from the first removal", lastAcc.Contains("buff(Buffs.Macrocosmos) && accretion && !accretions2 && accGo && partyLost(1604) >= 3.5")
         && Prop<string>(AR(planRules, "Earthquake: Microcosmos for the last Accretion"), "ActionName") == "Macrocosmos"
         && planRules.FindIndex(r => Prop<string>(r, "Name") == "Earthquake: Microcosmos for the last Accretion") < planRules.FindIndex(r => Prop<string>(r, "Name") == "Sun Sign (plan, last chance)"), lastAcc);
     // Earthquake's Macrocosmos from 2.6 s into the cast (its own heal at +17.6 or later, past that Microcosmos window; from 1 s

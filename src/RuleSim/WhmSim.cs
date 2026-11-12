@@ -758,6 +758,9 @@ internal sealed class WhmSim : IRuleRuntime
         Val("partyAvgHp", () => LivingParty(false).Select(p => Hp(p)).DefaultIfEmpty(100).Average());
         Val("partyLowestHp", () => LivingParty().Select(p => Hp(p)).DefaultIfEmpty(100).Min());
         F("partyBelow", [ParamKind.Number], 1, a => { var n = a[0].Value!; return () => LivingParty().Count(p => Hp(p) <= n()); });
+        // WrathCombo 2026-11-11 (the Phase 3 Earthquake plan): HP plus shields, at any range; a shield counts as 10%.
+        F("partyBelowShielded", [ParamKind.Number, ParamKind.Status], 1, a => { var n = a[0].Value!; var skip = a[1].Id; return () => LivingParty(false).Count(p => (skip == 0 || !HasAny(p, skip)) && Hp(p) + (Shielded(p) ? 10 : 0) <= n()); });
+        F("hpWith", [ParamKind.Status, ParamKind.Status], 1, a => { uint s1 = a[0].Id, s2 = a[1].Id; return () => LivingParty(false).Where(p => HasAny(p, s1) && (s2 == 0 || HasAny(p, s2))).Select(p => Hp(p) + (Shielded(p) ? 10 : 0)).DefaultIfEmpty(999).Min(); });
         Val("partyAlive", () => LivingParty(false).Count());
         Val("partyDead", () => W.Party.Count(p => W.Dead(p, T)));
         F("partyWith", St, 1, a => { var id = a[0].Id; return () => { var l = LivingParty(false).ToList(); return l.Count == 0 ? 0 : 100.0 * l.Count(p => HasAny(p, id)) / l.Count; }; });

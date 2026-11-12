@@ -675,6 +675,10 @@ internal sealed class SageSim : IRuleRuntime
         V("partyAvgHp", () => LivingParty(false).Select(p => W.HpPct(p, T)).DefaultIfEmpty(100).Average());
         V("partyLowestHp", () => LivingParty().Select(p => W.HpPct(p, T)).DefaultIfEmpty(100).Min());
         Fn("partyBelow", [ParamKind.Number], 1, a => { var n = a[0].Value!; return () => LivingParty().Count(p => W.HpPct(p, T) < n()); });
+        // WrathCombo 2026-11-11 (the Phase 3 Earthquake plan): HP plus shields, at any range. The replay knows who has a shield,
+        // not how big: one counts as 10%.
+        Fn("partyBelowShielded", [ParamKind.Number, ParamKind.Status], 1, a => { var n = a[0].Value!; var skip = a[1].Id; return () => LivingParty(false).Count(p => (skip == 0 || !HasAny(p, skip)) && W.HpPct(p, T) + (Shielded(p) ? 10 : 0) <= n()); });
+        Fn("hpWith", [ParamKind.Status, ParamKind.Status], 1, a => { uint s1 = a[0].Id, s2 = a[1].Id; return () => LivingParty(false).Where(p => HasAny(p, s1) && (s2 == 0 || HasAny(p, s2))).Select(p => W.HpPct(p, T) + (Shielded(p) ? 10 : 0)).DefaultIfEmpty(999).Min(); });
         V("partyAlive", () => LivingParty(false).Count());
         V("partyDead", () => W.Party.Count(p => W.Dead(p, T)));
         Fn("partyWith", St, 1, a => { var id = a[0].Id; return () => { var l = W.Party.Where(p => !W.Dead(p, T)).ToList(); return l.Count == 0 ? 0 : 100.0 * l.Count(p => HasAny(p, id)) / l.Count; }; });

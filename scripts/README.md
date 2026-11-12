@@ -46,5 +46,9 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   `--order`: each player's seat (role + First/Second/Third in Line, Accretion holders their own role) and, per laser set, who
   took a tether and who was clipped standing in a laser, against BossMod's D>S>A / S>D>A seatings.
   `--detail N` dumps one Black Hole: enemy casts and hits, mechanic statuses, deaths, your actions.
+- `dmu_earthquake.py <ACT log or folder> [...] [--since 20261024] [--list]`: every Phase 3 Earthquake in Dancing Mad: the two Accretion
+  holders' lines, when and by whose heal each came off, the lowest tank HP and how many others were under 45% at that moment, every
+  earth-crystal pulse (what set it off, its largest hit as % of max HP) and the tank auto-attacks; the totals set the healer plans'
+  Earthquake thresholds (optAccSafeHp, optAccTankHp, optCrustTankHp, 2026-11-11).
 - `check_rules_docs.py <WrathCombo repo root>`: checks docs/CustomRules.md against the code and bundled rule files: options, files, rule values and
   functions, target kinds. Numbers in the prose still need reading by hand.

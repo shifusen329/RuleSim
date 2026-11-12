@@ -39,10 +39,12 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   Dancing Mad tankbuster landed: main tank and other tank, how long before or after the cast each was applied and by which job.
 - `dmu_rr3_sge.py <ACT log or folder> [...] [--since 20261023] [--detail N]`: the first Revolting Ruin III as a Sage plays it: when its two hits land, how much
   they do, the tank's HP (from the real HP updates), when Taurochole went out and its overheal, and an estimate of landing it between the hits.
-- `dmu_black_hole.py <ACT log or folder> [...] [--job SGE] [--since 20261024] [--breaks] [--detail N [--from s] [--to s]]`: every
+- `dmu_black_hole.py <ACT log or folder> [...] [--job SGE] [--since 20261024] [--breaks] [--order] [--detail N [--from s] [--to s]]`: every
   Black Hole in Dancing Mad (Phase 3, ~9:37): your job, and each death after the cast with the hit that did it and the mechanic
   statuses held. `--breaks` lists each earth-crystal pulse and what set it off: an Accretion healed off (whose heal), or a
   Primordial Crust broken by a hit that would have killed (whose hit, on what HP); two pulses within 1.96 s wipe the party.
+  `--order`: each player's seat (role + First/Second/Third in Line, Accretion holders their own role) and, per laser set, who
+  took a tether and who was clipped standing in a laser, against BossMod's D>S>A / S>D>A seatings.
   `--detail N` dumps one Black Hole: enemy casts and hits, mechanic statuses, deaths, your actions.
 - `check_rules_docs.py <WrathCombo repo root>`: checks docs/CustomRules.md against the code and bundled rule files: options, files, rule values and
   functions, target kinds. Numbers in the prose still need reading by hand.

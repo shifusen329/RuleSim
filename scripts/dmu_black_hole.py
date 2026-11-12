@@ -4,13 +4,15 @@ end of the pull (or +75 s): who, when, the hit that killed them, their HP before
 (2026-11-11).
 
   dmu_black_hole.py <ACT log or folder> [...] [--me 10041112,1001A4A8] [--job SGE] [--since 20261024]
-                    [--breaks] [--detail N [--from -10] [--to 60]]
+                    [--breaks] [--order] [--detail N [--from -10] [--to 60]]
 
 The mechanic (BossMod's DMU Phase3.cs, checked against the logs): Earthquake leaves everyone on 1 HP with a Primordial Crust
 and puts Accretion on a healer and a DPS. A Crust keeps you on 1 HP once when a hit would kill you, then breaks; every broken
 Crust or healed-off Accretion makes the earth crystal pulse ~1.1 s later (50-90k to everyone, Earth Resistance Down II for
 1.96 s), and a second pulse inside that window does 1.3-1.6 M to everyone, which breaks every Crust at once: a wipe.
---breaks lists each pulse and what set it off. --job keeps the Black Holes where you played that job (3-letter, from your 03 line). --detail N dumps the Nth listed Black
+--breaks lists each pulse and what set it off. --order gives each player's seat (DPS / support / Accretion holder, plus the
+First/Second/Third in Line status from the Earthquake) and, per laser set, who took a tether (the 35 line's holder when the
+Black Hole fires) and who was clipped standing in a line, against BossMod's D>S>A and S>D>A seatings. --job keeps the Black Holes where you played that job (3-letter, from your 03 line). --detail N dumps the Nth listed Black
 Hole: enemy casts, enemy hits on players with HP, mechanic statuses (from enemies or the environment), deaths, and your
 own actions, statuses and the hits you took, from --from to --to seconds around the cast.
 Pure stdlib Python; finds the casts with mmap, so multi-GB logs are fine.
@@ -25,6 +27,14 @@ JOBS = {0x13: 'PLD', 0x14: 'MNK', 0x15: 'WAR', 0x16: 'DRG', 0x17: 'BRD', 0x18: '
         0x1E: 'NIN', 0x1F: 'MCH', 0x20: 'DRK', 0x21: 'AST', 0x22: 'SAM', 0x23: 'RDM', 0x24: 'BLU', 0x25: 'GNB', 0x26: 'DNC',
         0x27: 'RPR', 0x28: 'SGE', 0x29: 'VPR', 0x2A: 'PCT'}
 CAST = b'|BAFB|Black Hole|'
+SUPPORT = {'PLD', 'WAR', 'DRK', 'GNB', 'WHM', 'SCH', 'AST', 'SGE'}
+LINES = {'First in Line': 1, 'Second in Line': 2, 'Third in Line': 3}
+# Tether seats per laser set (BossMod's DMU Phase3.cs DSASet): who takes the tethers, as (role, X-in-Line). Accretion holders
+# are their own role. Each seat appears in three neighbouring sets, so exactly one Crust breaks per set from set 2-1 on.
+SETS = ['1-1', '1-2', '2-1', '2-2', '2-3', '3-1', '3-2', '3-3', '4-1', '4-2']
+DSA = [['DPS1'], ['DPS1', 'SUP1'], ['DPS1', 'SUP1', 'ACC1'], ['DPS2', 'SUP1', 'ACC1'], ['DPS2', 'SUP2', 'ACC1'],
+       ['DPS2', 'SUP2', 'ACC2'], ['DPS3', 'SUP2', 'ACC2'], ['DPS3', 'SUP3', 'ACC2'], ['DPS3', 'SUP3'], ['SUP3']]
+SDA = [[{'DPS': 'SUP', 'SUP': 'DPS'}.get(s[:3], s[:3]) + s[3] for s in st] for st in DSA]
 
 
 def ts(s):
@@ -120,6 +130,84 @@ def scan(path, me, since):
     return out
 
 
+def party_jobs(bh):
+    """Player id -> job, from the 03 (added combatant) lines since the zone-in."""
+    jobs = {}
+    with open(bh['path'], 'rb') as fh:
+        mm = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
+        p = bh['zp']
+        while True:
+            p = mm.find(b'\n03|', p + 1, bh['off'])
+            if p < 0:
+                break
+            l = mm[p + 1:mm.find(b'\n', p + 1)].decode('utf-8', 'replace').split('|')
+            if len(l) > 4 and l[2][:1] == '1':
+                jobs[l[2]] = JOBS.get(int(l[4], 16), l[4])
+        mm.close()
+    return jobs
+
+
+def order(rows, jobs, me):
+    """Each player's Black Hole seat (role + X-in-Line from the Earthquake statuses) and every laser set against BossMod's
+    DSA (and SDA) seating."""
+    line, acc, names = {}, set(), {}
+    for r, l in rows:
+        if l[0] == '26' and l[7][:1] == '1' and r < 0:
+            if l[3] in LINES:
+                line[l[7]] = LINES[l[3]]
+                names[l[7]] = l[8]
+            elif l[3] == 'Accretion':
+                acc.add(l[7])
+    seat = {}
+    for i, n in line.items():
+        role = 'ACC' if i in acc else 'SUP' if jobs.get(i) in SUPPORT else 'DPS'
+        seat[i] = f'{role}{n}'
+    print('    seats: ' + ', '.join(f"{seat[i]} {('YOU ' if i in me else '') + names[i]} ({jobs.get(i, '?')})"
+                                     for i in sorted(seat, key=lambda i: (seat[i][3], seat[i]))))
+    # The laser is a 125 y line aimed at the tether holder (the 35 line's target when it fires); anyone else in the line is
+    # clipped and takes a stack too.
+    holder = {}
+    sets, last = [], None
+    for r, l in rows:
+        if l[0] == '35' and len(l) > 8 and l[8] == '0054':
+            holder[l[2]] = l[4]
+        elif l[0] in ('21', '22') and l[5] == 'Nothingness' and l[6][:1] == '1':
+            if last is None or r - last > 1.0:
+                sets.append((r, {}, []))
+            aimed = holder.get(l[2])
+            if aimed and l[2] not in sets[-1][1]:
+                sets[-1][1][l[2]] = aimed
+            sets[-1][2].append((l[2], l[6]))
+            last = r
+    stacks = {}
+    fits = {'DSA': 0, 'SDA': 0}
+
+    def who(i):
+        return f"{seat.get(i, '?')} {('YOU ' if i in me else '') + names.get(i, i)}"
+
+    for k, (r, aimed, hit) in enumerate(sets):
+        for _, i in hit:
+            stacks[i] = stacks.get(i, 0) + 1
+        takers = sorted(set(aimed.values()), key=lambda i: seat.get(i, '?'))
+        clipped = sorted({i for src, i in hit if aimed.get(src) != i}, key=lambda i: seat.get(i, '?'))
+        mine = sorted(seat.get(i, '?') for i in aimed.values())
+        want = sorted(DSA[k]) if k < len(DSA) else []
+        alt = sorted(SDA[k]) if k < len(SDA) else []
+        fits['DSA'] += mine == want
+        fits['SDA'] += mine == alt
+        broke = [i for i in stacks if stacks[i] == 3 and any(i == j for _, j in hit)]
+        note = 'DSA ok' if mine == want else 'SDA ok' if mine == alt else f"DSA wants {' '.join(want) or '-'}"
+        print(f"    {r:5.1f}  set {SETS[k] if k < len(SETS) else '?':3}  took: "
+              + ', '.join(f'{who(i)} ({stacks[i]})' for i in takers) + f'   [{note}]')
+        if clipped:
+            print('                 clipped: ' + ', '.join(f'{who(i)} ({stacks[i]})' for i in clipped))
+        if broke:
+            print(f"                 third laser, Crust breaks: {', '.join(who(i) for i in broke)}"
+                  + ('   <- more than one: two pulses at once' if len(broke) > 1 else ''))
+    if sets:
+        print(f"    tether sets matching DSA {fits['DSA']}/{len(sets)}, SDA {fits['SDA']}/{len(sets)}")
+
+
 def window(bh, me, a, b):
     """Parsed lines from a s to b s around the cast, stopping at the end of combat."""
     with open(bh['path'], 'rb') as fh:
@@ -133,7 +221,7 @@ def window(bh, me, a, b):
                 e = len(mm)
             raw = mm[o:e]
             o = e + 1
-            if not raw[:3] in (b'20|', b'21|', b'22|', b'23|', b'25|', b'26|', b'30|', b'260', b'24|'):
+            if not raw[:3] in (b'20|', b'21|', b'22|', b'23|', b'25|', b'26|', b'30|', b'260', b'24|', b'35|'):
                 continue
             l = raw.decode('utf-8', 'replace').rstrip('\r').split('|')
             try:
@@ -255,12 +343,12 @@ def detail(rows, me):
 def main():
     args = sys.argv[1:]
     opt = {'--me': '10041112,1001A4A8', '--job': None, '--since': None, '--detail': None, '--from': '-10', '--to': '60',
-           '--breaks': False}
+           '--breaks': False, '--order': False}
     paths = []
     i = 0
     while i < len(args):
-        if args[i] == '--breaks':
-            opt['--breaks'] = True
+        if args[i] in ('--breaks', '--order'):
+            opt[args[i]] = True
             i += 1
         elif args[i] in opt:
             opt[args[i]] = args[i + 1]
@@ -283,6 +371,9 @@ def main():
         print(f"#{n} {b['T']:%Y-%m-%d %H:%M:%S}  {os.path.basename(b['path'])}  you {b['job']}  Black Hole at "
               f"{int(pt // 60)}:{pt % 60:04.1f}")
         if opt['--detail'] is not None:
+            continue
+        if opt['--order']:
+            order(window(b, me, -25, 75), party_jobs(b), me)
             continue
         if opt['--breaks']:
             for r, kind, text in breaks(window(b, me, -25, 75), me):

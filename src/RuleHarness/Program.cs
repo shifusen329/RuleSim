@@ -746,9 +746,10 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     }
     // A truth table of the held countdown: the builtins it reads become plain values.
     string Sub(string s) => s.Replace("cd(NoMercy)", "cdNm").Replace("castsSeen(Forsaken)", "fs").Replace("sinceCast(Forsaken)", "fsT")
-        .Replace("combatTime", "ct").Replace("zone == 1363", "dmu");
+        .Replace("castsSeen(MysteryMagic)", "mm").Replace("sinceCast(MysteryMagic)", "mmT").Replace("castsSeen(UltimateEmbrace)", "ue")
+        .Replace("sinceCast(UltimateEmbrace)", "ueT").Replace("combatTime", "ct").Replace("zone == 1363", "dmu");
     // nmHpHold (optNoMercyHoldHp, 2026-11-03) is off here; its own check is with the other target-HP holds.
-    var holdEnv = new Dictionary<string, string> { ["optP1BurstHoldHp"] = "20", ["dmu"] = "1", ["nmHpHold"] = "0" };
+    var holdEnv = new Dictionary<string, string> { ["optP1BurstHoldHp"] = "20", ["dmu"] = "1", ["nmHpHold"] = "0", ["mm"] = "0", ["mmT"] = "999", ["ue"] = "0", ["ueT"] = "999" };
     foreach (var n in holdNames) holdEnv[n] = Sub(gst[n]);
     // The Dancing Mad raid-window hold is off here (its own truth table below).
     holdEnv["alignWait"] = "0";
@@ -762,18 +763,37 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         && Held(187, 0, 0, 0, 0) == 0 && NmIn(187, 0, 0, 0, 0) == 0 && Held(150, 37, 0, 0, 0) == 0 && NmIn(150, 37, 0, 0, 0) == 37
         && Held(400, 20, 0, 3, 5) == 0,
         $"{NmIn(189, 0, 1, 0, 0)} {NmIn(208, 0, 0, 0, 0)} {NmIn(235, 0, 0, 1, 9.5)} {NmIn(242, 0, 0, 1, 13.1)}");
+    // 2026-11-14 (user: "No Mercy isn't firing in P2 when it's held after P1"): in the four Phase 2 pulls that night No Mercy
+    // went 210-229 s in, as Phase 2's Kefka became targetable, not at Forsaken + 13 s. combatTime restarts when your own
+    // in-combat flag drops (between the Phase 1 Kefka leaving and the Phase 2 one arriving, or while dead), so the hold is
+    // also keyed on the fight's casts (the history follows the party's combat): after Phase 1's third Mystery Magic, or once
+    // Phase 2's Ultimate Embrace is cast, it holds until the window, counted from those casts; and the end-of-Phase-1 hold
+    // never applies once Ultimate Embrace is seen.
+    {
+        Dictionary<string, string> E(double ct, double cdNm, int mm = 0, double mmT = 999, int ue = 0, double ueT = 999, int fs = 0, double fsT = 999) =>
+            new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = "0", ["mm"] = $"{mm}", ["mmT"] = $"{mmT}", ["ue"] = $"{ue}", ["ueT"] = $"{ueT}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" };
+        E2E("GNB_ST: No Mercy held through Phase 2's start even if combatTime restarted, released at Forsaken + 13 s",
+            Eval("nmHold", E(2, 0, mm: 3, mmT: 28.6, ue: 1, ueT: 0.8)) == 1 && Math.Abs(Eval("nmCd", E(2, 0, mm: 3, mmT: 28.6, ue: 1, ueT: 0.8)) - 25.4) < 0.01
+            && Eval("nmHold", E(1, 0, mm: 3, mmT: 27)) == 1 && Math.Abs(Eval("nmCd", E(1, 0, mm: 3, mmT: 27)) - 33.0) < 0.01
+            && Eval("nmHold", E(16, 0, mm: 3, mmT: 43, ue: 1, ueT: 14, fs: 1, fsT: 0.8)) == 1 && Math.Abs(Eval("nmCd", E(16, 0, mm: 3, mmT: 43, ue: 1, ueT: 14, fs: 1, fsT: 0.8)) - 12.2) < 0.01
+            && Eval("nmHold", E(30, 0, mm: 3, mmT: 57, ue: 1, ueT: 27, fs: 1, fsT: 13.2)) == 0
+            && Eval("nmHold", E(190, 0, mm: 3, mmT: 8)) == 0 && Eval("nmHold", E(190, 9, mm: 3, mmT: 8)) == 1
+            && gst["p1Ending"].Contains("&& castsSeen(UltimateEmbrace) == 0 &&") && gaoe["p1Ending"] == gst["p1Ending"],
+            $"{Eval("nmCd", E(2, 0, mm: 3, mmT: 28.6, ue: 1, ueT: 0.8))} {Eval("nmCd", E(1, 0, mm: 3, mmT: 27))} {Eval("nmCd", E(16, 0, mm: 3, mmT: 43, ue: 1, ueT: 14, fs: 1, fsT: 0.8))}");
+    }
     // The Dancing Mad raid windows (optDmuAlign): a No Mercy back within 9 s of the next one's 90th percentile waits until a raid
     // buff is up or that time passes; the countdown reads the window's median (2 s earlier). Phase 1: 123.7 s; Phase 2: first
     // Forsaken +14.7 s and +138.9 s; Phase 3: first Definition of Insanity +64.3 s and +187 s; none from Phase 4.
     {
         string Sub2(string s) => s.Replace("castsSeen(KefkaSays)", "ks").Replace("castsSeen(Forsaken)", "fs").Replace("firstCast(Forsaken)", "ff")
+            .Replace("castsSeen(UltimateEmbrace)", "ue").Replace("sinceCast(UltimateEmbrace)", "ueT")
             .Replace("castsSeen(DefinitionOfInsanity)", "doi").Replace("firstCast(DefinitionOfInsanity)", "fd").Replace("combatTime", "ct")
             .Replace("zone == 1363", "dmu").Replace("cd(NoMercy)", "cdNm").Replace("inCombat", "1");
-        Dictionary<string, string> Env(double ct, int buffs, int fs = 0, double ff = 999, int doi = 0, double fd = 999, int ks = 0, int dmu = 1) => new()
+        Dictionary<string, string> Env(double ct, int buffs, int fs = 0, double ff = 999, int doi = 0, double fd = 999, int ks = 0, int dmu = 1, int ue = 0, double ueT = 999) => new()
         {
             ["dmuAlign"] = Sub2(gst["dmuAlign"]), ["dmuWin"] = Sub2(gst["dmuWin"]), ["alignWait"] = Sub2(gst["alignWait"]),
             ["optDmuAlign"] = "1", ["dmu"] = $"{dmu}", ["raidBuffs"] = $"{buffs}", ["ct"] = $"{ct}", ["fs"] = $"{fs}", ["ff"] = $"{ff}",
-            ["doi"] = $"{doi}", ["fd"] = $"{fd}", ["ks"] = $"{ks}", ["cdNm"] = "0", ["p1Ending"] = "0", ["p2Wait"] = "0", ["nmHpHold"] = "0", ["nmRelease"] = "0",
+            ["doi"] = $"{doi}", ["fd"] = $"{fd}", ["ks"] = $"{ks}", ["ue"] = $"{ue}", ["ueT"] = $"{ueT}", ["cdNm"] = "0", ["p1Ending"] = "0", ["p2Wait"] = "0", ["nmHpHold"] = "0", ["nmRelease"] = "0",
         };
         double Wait(Dictionary<string, string> e) => Eval("alignWait", e);
         double NmCd(Dictionary<string, string> e) => Eval(Sub2(gst["nmCd"]), e);
@@ -782,7 +802,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             && Wait(Env(124, 0)) == 0 && Wait(Env(110, 0)) == 0 && Wait(Env(117, 0, dmu: 0)) == 0
             && Wait(Env(240, 0, fs: 1, ff: 8)) == 1 && Wait(Env(260, 0, fs: 1, ff: 15)) == 0 && Wait(Env(360, 0, fs: 1, ff: 132)) == 1
             && Wait(Env(700, 0, fs: 1, ff: 470, doi: 1, fd: 58)) == 1 && Wait(Env(820, 0, fs: 1, ff: 590, doi: 1, fd: 180)) == 1
-            && Wait(Env(900, 0, fs: 1, ff: 670, doi: 1, fd: 260)) == 0 && Wait(Env(1000, 0, fs: 1, ff: 770, doi: 1, fd: 360, ks: 1)) == 0,
+            && Wait(Env(900, 0, fs: 1, ff: 670, doi: 1, fd: 260)) == 0 && Wait(Env(1000, 0, fs: 1, ff: 770, doi: 1, fd: 360, ks: 1)) == 0
+            && Wait(Env(3, 0, ue: 1, ueT: 20)) == 1 && Wait(Env(3, 0, ue: 1, ueT: 10)) == 0,
             $"{Wait(Env(117, 0))} {NmCd(Env(117, 0))} {Wait(Env(240, 0, fs: 1, ff: 8))} {Wait(Env(700, 0, fs: 1, ff: 470, doi: 1, fd: 58))}");
     }
     E2E("GNB_ST: a No Mercy held under optNoMercyHoldHp reads as far off (999)", NmIn(150, 0, 0, 0, 0) == 0

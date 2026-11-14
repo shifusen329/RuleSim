@@ -729,15 +729,20 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     // The user (2026-11-01): No Mercy is held with Bloodfest at the end of Phase 1 under optP1BurstHoldHp, and (held, or
     // back after Phase 1's forced end at 198 s) until Phase 2's first 2-minute window, Forsaken + 13 s; meanwhile the
     // rotation counts down to that release. Same defines in both files.
-    var holdNames = new[] { "p2Window", "p2Wait", "nmHold", "nmRelease", "nmCd" };
+    var holdNames = new[] { "p2Window", "p2Wait", "nmHold", "nmRelease", "nmCd", "dmuAlign", "dmuWin", "alignWait" };
     var gst = Defines("GNB_ST.json");
     var gaoe = Defines("GNB_AoE.json");
     E2E("GNB_ST / GNB_AoE: the same No Mercy hold defines", holdNames.All(n => gst[n] == gaoe[n]), string.Join(", ", holdNames.Where(n => gst.GetValueOrDefault(n) != gaoe.GetValueOrDefault(n))));
     foreach (var f in new[] { "GNB_ST.json", "GNB_AoE.json" })
     {
         var rs = RuleList(Rules(f));
-        E2E($"{f}: No Mercy waits while nmHold (p1Ending || p2Wait); Bloodfest keys on the held countdown", Src(R(rs, "No Mercy")).Contains("&& !nmHold &&")
-            && Defines(f)["nmHold"] == "p1Ending || p2Wait" && Src(R(rs, "Bloodfest")).Contains("nmCd <= gcd + 1.0") && Defines(f)["p2Wait"].Contains("zone == 1363"));
+        E2E($"{f}: No Mercy waits while nmHold (p1Ending || p2Wait || alignWait); Bloodfest keys on the held countdown", Src(R(rs, "No Mercy")) == "nmNow"
+            && Defines(f)["nmNow"].Contains("&& !nmHold &&") && Defines(f)["nmHold"] == "p1Ending || p2Wait || alignWait" && Src(R(rs, "Bloodfest")) == "bfNow"
+            && Defines(f)["bfNow"].Contains("nmCd <= gcd + 1.0") && Defines(f)["p2Wait"].Contains("zone == 1363"));
+        // 2026-11-14 (user: "Align No Mercy with raid buffs ... while in DMU"): in Dancing Mad a due Bloodfest or No Mercy takes
+        // the weave slot before a Continuation, which still clips in before it would be lost.
+        E2E($"{f}: in Dancing Mad, Bloodfest and No Mercy weave before a Continuation", Src(rs.First(r => Prop<string>(r, "Name").StartsWith("Continuation"))).Contains("(canWeave && !burstFirst || remainingGcd < 0.7)")
+            && Defines(f)["burstFirst"] == "dmuAlign && canWeave && (bfNow && ready(Bloodfest) || nmNow && ready(NoMercy))" && Defines(f)["optDmuAlign"] == "1");
     }
     // A truth table of the held countdown: the builtins it reads become plain values.
     string Sub(string s) => s.Replace("cd(NoMercy)", "cdNm").Replace("castsSeen(Forsaken)", "fs").Replace("sinceCast(Forsaken)", "fsT")
@@ -745,6 +750,10 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     // nmHpHold (optNoMercyHoldHp, 2026-11-03) is off here; its own check is with the other target-HP holds.
     var holdEnv = new Dictionary<string, string> { ["optP1BurstHoldHp"] = "20", ["dmu"] = "1", ["nmHpHold"] = "0" };
     foreach (var n in holdNames) holdEnv[n] = Sub(gst[n]);
+    // The Dancing Mad raid-window hold is off here (its own truth table below).
+    holdEnv["alignWait"] = "0";
+    holdEnv["dmuWin"] = "999";
+    holdEnv["dmuAlign"] = "0";
     double NmIn(double ct, double cdNm, int p1, int fs, double fsT) => Eval("nmCd", new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = $"{p1}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" });
     double Held(double ct, double cdNm, int p1, int fs, double fsT) => Eval("nmHold", new(holdEnv) { ["ct"] = $"{ct}", ["cdNm"] = $"{cdNm}", ["p1Ending"] = $"{p1}", ["fs"] = $"{fs}", ["fsT"] = $"{fsT}" });
     E2E("GNB_ST: No Mercy held at 3:09 under the set % and at Phase 2's start, released at Forsaken + 13 s; not held at 3:07 over it",
@@ -753,6 +762,29 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         && Held(187, 0, 0, 0, 0) == 0 && NmIn(187, 0, 0, 0, 0) == 0 && Held(150, 37, 0, 0, 0) == 0 && NmIn(150, 37, 0, 0, 0) == 37
         && Held(400, 20, 0, 3, 5) == 0,
         $"{NmIn(189, 0, 1, 0, 0)} {NmIn(208, 0, 0, 0, 0)} {NmIn(235, 0, 0, 1, 9.5)} {NmIn(242, 0, 0, 1, 13.1)}");
+    // The Dancing Mad raid windows (optDmuAlign): a No Mercy back within 9 s of the next one's 90th percentile waits until a raid
+    // buff is up or that time passes; the countdown reads the window's median (2 s earlier). Phase 1: 123.7 s; Phase 2: first
+    // Forsaken +14.7 s and +138.9 s; Phase 3: first Definition of Insanity +64.3 s and +187 s; none from Phase 4.
+    {
+        string Sub2(string s) => s.Replace("castsSeen(KefkaSays)", "ks").Replace("castsSeen(Forsaken)", "fs").Replace("firstCast(Forsaken)", "ff")
+            .Replace("castsSeen(DefinitionOfInsanity)", "doi").Replace("firstCast(DefinitionOfInsanity)", "fd").Replace("combatTime", "ct")
+            .Replace("zone == 1363", "dmu").Replace("cd(NoMercy)", "cdNm").Replace("inCombat", "1");
+        Dictionary<string, string> Env(double ct, int buffs, int fs = 0, double ff = 999, int doi = 0, double fd = 999, int ks = 0, int dmu = 1) => new()
+        {
+            ["dmuAlign"] = Sub2(gst["dmuAlign"]), ["dmuWin"] = Sub2(gst["dmuWin"]), ["alignWait"] = Sub2(gst["alignWait"]),
+            ["optDmuAlign"] = "1", ["dmu"] = $"{dmu}", ["raidBuffs"] = $"{buffs}", ["ct"] = $"{ct}", ["fs"] = $"{fs}", ["ff"] = $"{ff}",
+            ["doi"] = $"{doi}", ["fd"] = $"{fd}", ["ks"] = $"{ks}", ["cdNm"] = "0", ["p1Ending"] = "0", ["p2Wait"] = "0", ["nmHpHold"] = "0", ["nmRelease"] = "0",
+        };
+        double Wait(Dictionary<string, string> e) => Eval("alignWait", e);
+        double NmCd(Dictionary<string, string> e) => Eval(Sub2(gst["nmCd"]), e);
+        E2E("GNB_ST: in Dancing Mad, No Mercy waits up to 9 s for the party's raid buffs, released by a buff or the window's 90th percentile",
+            Wait(Env(117, 0)) == 1 && Math.Abs(NmCd(Env(117, 0)) - 4.7) < 0.01 && Wait(Env(117, 1)) == 0 && NmCd(Env(117, 1)) == 0
+            && Wait(Env(124, 0)) == 0 && Wait(Env(110, 0)) == 0 && Wait(Env(117, 0, dmu: 0)) == 0
+            && Wait(Env(240, 0, fs: 1, ff: 8)) == 1 && Wait(Env(260, 0, fs: 1, ff: 15)) == 0 && Wait(Env(360, 0, fs: 1, ff: 132)) == 1
+            && Wait(Env(700, 0, fs: 1, ff: 470, doi: 1, fd: 58)) == 1 && Wait(Env(820, 0, fs: 1, ff: 590, doi: 1, fd: 180)) == 1
+            && Wait(Env(900, 0, fs: 1, ff: 670, doi: 1, fd: 260)) == 0 && Wait(Env(1000, 0, fs: 1, ff: 770, doi: 1, fd: 360, ks: 1)) == 0,
+            $"{Wait(Env(117, 0))} {NmCd(Env(117, 0))} {Wait(Env(240, 0, fs: 1, ff: 8))} {Wait(Env(700, 0, fs: 1, ff: 470, doi: 1, fd: 58))}");
+    }
     E2E("GNB_ST: a No Mercy held under optNoMercyHoldHp reads as far off (999)", NmIn(150, 0, 0, 0, 0) == 0
         && Eval("nmCd", new(holdEnv) { ["ct"] = "150", ["cdNm"] = "0", ["p1Ending"] = "0", ["fs"] = "0", ["fsT"] = "0", ["nmHpHold"] = "1" }) == 999);
     // The standard opener (2026-11-05, user: "add the standard opener as optional"; Icy Veins 7.4 / Wrath's Normal opener):
@@ -782,8 +814,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     [
         ("PLD_ST.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, cd(FightOrFlight))")]),
         ("PLD_AoE.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, cd(FightOrFlight))")]),
-        ("GNB_ST.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "!nmHpHold"), ("Bloodfest", "!nmHpHold")], [("nmCd", "if(nmHpHold, 999,")]),
-        ("GNB_AoE.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "!nmHpHold"), ("Bloodfest", "!nmHpHold")], [("nmCd", "if(nmHpHold, 999,")]),
+        ("GNB_ST.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "nmNow"), ("Bloodfest", "bfNow")], [("nmCd", "if(nmHpHold, 999,"), ("nmNow", "!nmHpHold"), ("bfNow", "!nmHpHold")]),
+        ("GNB_AoE.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "nmNow"), ("Bloodfest", "bfNow")], [("nmCd", "if(nmHpHold, 999,"), ("nmNow", "!nmHpHold"), ("bfNow", "!nmHpHold")]),
         ("RDM_ST.json", "optEmboldenHoldHp", "embHpHold", [("Embolden", "!embHpHold"), ("Manafication (between combos)", "cdE <= 5 && !embHpHold")], [("startCombo", "holdBurst || embHpHold")]),
         ("RDM_ST.json", "optManaficationHoldHp", "manaHpHold", [("Manafication (between combos)", "!manaHpHold")], [("startCombo", "ready(Manafication) && !manaHpHold")]),
         ("RDM_AoE.json", "optEmboldenHoldHp", "embHpHold", [("Embolden", "!embHpHold"), ("Manafication (between combos)", "cdE <= 5 && !embHpHold")], []),

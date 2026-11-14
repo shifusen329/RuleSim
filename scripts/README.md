@@ -18,6 +18,9 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
 - `install_now.sh <staged plugin dir> <rules source dir> <backup dir> [rule file ...]`: when the user says "install",
   installs a staged build right away, game running or not: backs up, copies WrathCombo.pdb then WrathCombo.dll, waits for
   Dalamud's "Finished loading WrathCombo", then copies the rule files.
+- `install_rules_out_of_combat.sh <rules source dir> <backup dir> <max hours> <rule file> [...]`: for "install when I'm out of
+  combat": waits until the newest ACT log's last combat-state (260) line shows ACT and the game out of combat for 3 s, backs up
+  the live rules folder, copies the rule files (JSON only, no plugin) and shows Dalamud's "Loaded N rule set(s)".
 - `fflogs_pull.sh <out dir> <tag> <job or name> <zone "hex:name"> <code>/<fight> [...]`: downloads FFLogs fights and
   rebuilds each as an ACT log (WrathCombo utils/fetch.py + convert.py) in `<out dir>/<tag>1..N`, written as the given
   player and zone ("522:Mistwake" for a dungeon run, "553:Dancing Mad (Ultimate)" for DMU). FFLogs ranks dungeons by DPS,

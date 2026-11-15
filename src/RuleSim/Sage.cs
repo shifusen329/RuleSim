@@ -253,7 +253,7 @@ internal sealed class SageSim : IRuleRuntime
 
     private Actor? Candidate(RuleTargetSpec spec)
     {
-        bool Ok(Actor? a) => a is not null && spec.Filters.All(f => (f.AnyShield ? Shielded(a) : HasAny(a, f.StatusId)) != f.Negate);
+        bool Ok(Actor? a) => a is not null && spec.Filters.All(f => (f.Cast is { } fc ? CastTargetAt(fc, p => p.Id == a.Id) is not null : f.AnyShield ? Shielded(a) : HasAny(a, f.StatusId)) != f.Negate);
         IEnumerable<Actor> Others(Func<Actor, bool> role) => LivingParty().Where(p => role(p) && p.Id != W.Me.Id);
         Actor? Lowest(IEnumerable<Actor> l) => l.Where(Ok).MinBy(p => W.HpPct(p, T));
         var c = spec.Kind switch

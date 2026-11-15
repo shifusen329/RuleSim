@@ -360,7 +360,7 @@ internal sealed class AstSim : IRuleRuntime
     {
         foreach (var spec in targets)
         {
-            bool Ok(Actor? a) => a is not null && spec.Filters.All(f => (f.AnyShield ? Shielded(a) : HasAny(a, f.StatusId)) != f.Negate);
+            bool Ok(Actor? a) => a is not null && spec.Filters.All(f => (f.Cast is { } fc ? CastTargetAt(fc, p => p.Id == a.Id) is not null : f.AnyShield ? Shielded(a) : HasAny(a, f.StatusId)) != f.Negate);
             IEnumerable<Actor> Others(Func<Actor, bool> role) => LivingParty().Where(p => role(p) && p.Id != W.Me.Id);
             Actor? Lowest(IEnumerable<Actor> l) => l.Where(Ok).MinBy(p => Hp(p));
             var c = spec.Kind switch

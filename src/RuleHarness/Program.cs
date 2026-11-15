@@ -421,24 +421,24 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
     // tank, then Eukrasia for Eukrasian Dosis on his return; aggro resets there, so not by the boss's target): the off tank is
     // Revolting Ruin III #2's cast target, the main tank the one without that Taurochole; timed from the third Mystery Magic
     // (+23.8 s: both still up at the first Ultimate Embrace's hit, +38.9 s); Taurochole kept for it from 160 s; the first
-    // Ultimate Embrace left out of the boss's-target buster rules. Taurochole and Haima ahead of the shields, and the shields
-    // on until Kefka is back (2026-11-14 22:30: the other tank was left bare when they stopped at +23.0 s).
+    // Ultimate Embrace left out of the boss's-target buster rules. 2026-11-15, user, in this order: Eukrasian Diagnosis on both
+    // tanks while Kefka is away (until he is back), Eukrasian Dosis on his return, Haima on the main tank
+    // (tank !castTarget(RevoltingRuinIII)), Taurochole on the off tank.
     {
         var sgeSt = File.ReadAllText(Path.Combine(examples, "SGE_ST_DPS.json"));
-        var p2 = new[] { "Phase 2 start: Taurochole on the off tank (Revolting Ruin III #2's)", "Phase 2 start: Rhizomata for that Taurochole",
-            "Phase 2 start: Haima on the main tank (the one without Taurochole)", "Phase 2 start: Haima on a tank (no Taurochole landed)",
-            "Phase 2 start: Eukrasia for the tank shields", "Phase 2 start: Eukrasian Diagnosis on a tank",
+        var p2 = new[] { "Phase 2 start: Eukrasia for the tank shields", "Phase 2 start: Eukrasian Diagnosis on a tank",
             "Phase 2 start: Eukrasia for Eukrasian Dosis on Kefka's return", "Phase 2 start: Eukrasian Dosis on Kefka's return",
-            "Phase 2 start: hold the Eukrasia for Kefka" };
+            "Phase 2 start: Haima on the main tank (not Revolting Ruin III #2's)", "Phase 2 start: Taurochole on the off tank (Revolting Ruin III #2's)",
+            "Phase 2 start: Rhizomata for that Taurochole", "Phase 2 start: hold the Eukrasia for Kefka" };
         var idx = p2.Select(n => sgeSt.IndexOf("\"name\": \"" + n + "\"")).ToList();
         string RuleText(string n) { var i = sgeSt.IndexOf("\"name\": \"" + n + "\""); return i < 0 ? "" : sgeSt.Substring(i, sgeSt.IndexOf('}', i) - i); }
-        E2E("SGE_ST_DPS: Phase 2's start shields both tanks, Taurochole on Revolting Ruin III #2's tank, Haima on the other, then Eukrasian Dosis",
+        E2E("SGE_ST_DPS: Phase 2's start shields both tanks, then Eukrasian Dosis on Kefka, Haima on the main tank, Taurochole on Revolting Ruin III #2's tank",
             idx.All(i => i > 0) && idx.SequenceEqual(idx.OrderBy(i => i)) && idx[0] < sgeSt.IndexOf("\"name\": \"Kardia on the boss's target\"")
-            && RuleText(p2[0]).Contains("\"target\": \"castTarget(RevoltingRuinIII) !Kerachole") && RuleText(p2[0]).Contains("!tankHas(2619)")
-            && RuleText(p2[2]).Contains("\"target\": \"tank !2619 !Haima !Panhaima") && RuleText(p2[2]).Contains("tankHas(2619) && !tankHas(Haima)")
-            && RuleText(p2[4]).Contains("\"when\": \"p2Gap && !hasTarget && !euk && tanksUnshielded >= 1\"")
+            && RuleText(p2[5]).Contains("\"target\": \"castTarget(RevoltingRuinIII) !Kerachole") && RuleText(p2[5]).Contains("ue1HaimaDone && gall >= 1 && !tankHas(2619)")
+            && RuleText(p2[4]).Contains("\"target\": \"tank !castTarget(RevoltingRuinIII) !Haima !Panhaima")
+            && RuleText(p2[0]).Contains("\"when\": \"p2Gap && !hasTarget && !euk && tanksUnshielded >= 1\"")
             && sgeSt.Contains("\"p2Gap\": \"planZone && castsSeen(MysteryMagic) >= 3 && castsSeen(UltimateEmbrace) == 0 && sinceCast(MysteryMagic) >= 16.0\"")
-            && sgeSt.Contains("castsSeen(UltimateEmbrace) == 0 && sinceCast(MysteryMagic) >= 23.8 || castsSeen(UltimateEmbrace) == 1 && ueBoth")
+            && sgeSt.Contains("castsSeen(UltimateEmbrace) == 0 && sinceCast(MysteryMagic) >= 26.0 && (dot || debuff(EukrasianDyskrasia) || justUsed(EukrasianDosis3, 3) || sinceCast(MysteryMagic) >= 31.0) || castsSeen(UltimateEmbrace) == 1 && ueBoth")
             && sgeSt.Contains("|| ueBoth && castsSeen(UltimateEmbrace) >= 2)) && !busterRuin")
             && System.Text.RegularExpressions.Regex.Matches(sgeSt, "\"action\": \"Taurochole\"[^}]*!ue1TauroKeep").Count == 4,
             string.Join(" ", idx));
@@ -1103,6 +1103,13 @@ E2E("mouseover target kind", RuleTargets.TryParseKind("mouseover", out var mouse
     E2E("castTarget(Name) target kind: cast name normalized, filters kept, fallback", castOk && castSpecs.Length == 2 && castSpecs[0].Kind == RuleTarget.CastTarget
         && castSpecs[0].Cast == "revoltingruiniii" && castSpecs[0].Filters.Count == 1 && castSpecs[1].Kind == RuleTarget.Tank, castErr ?? "");
     E2E("castTarget() without a name is an error", !RuleTargets.TryParse("castTarget()", symbols, out _, out var emptyErr) && emptyErr!.Contains("cast name"), emptyErr ?? "");
+    // As a filter (2026-11-15): the other tank is "tank !castTarget(RevoltingRuinIII)".
+    var filterOk = RuleTargets.TryParse("tank !castTarget(RevoltingRuinIII) !2612, tank castTarget(RevoltingRuinIII)", symbols, out var filterSpecs, out var filterErr);
+    E2E("castTarget(Name) target filter: negatable, name normalized, next to status filters", filterOk && filterSpecs.Length == 2
+        && filterSpecs[0].Filters is [{ Negate: true, Cast: "revoltingruiniii" }, { Negate: true, Cast: null, StatusId: 2612 }]
+        && filterSpecs[1].Filters is [{ Negate: false, Cast: "revoltingruiniii" }], filterErr ?? "");
+    E2E("castTarget filter without a name is an error", !RuleTargets.TryParse("tank !castTarget()", symbols, out _, out var filterEmptyErr)
+        && filterEmptyErr!.Contains("castTarget filter"), filterEmptyErr ?? "");
 }
 {
     var examples = Path.GetDirectoryName(Path.GetFullPath(samPath))!;

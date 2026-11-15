@@ -58,5 +58,8 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   first Definition of Insanity) and where every player's uses of an action fell against them; set GNB_ST's optDmuAlign windows.
 - `dmu_gnb_nomercy.py <ACT log or folder> [...] [--since 20261023]`: your Gunbreaker No Mercies in Dancing Mad: how long each
   waited after it was back, how far after the party's raid buffs it went, and which abilities took the weave slots meanwhile.
+- `dmu_p1_end.py <ACT log or folder> [...] [--since 20260920]`: how Dancing Mad's Phase 1 ends: Kefka's HP at 185/190/195 s and
+  at his last hit, for pulls that reached Phase 2 and for those that ended at 190-215 s (the Light of Judgment enrage), so
+  the HP check at the transition (about 15%, 2026-11-14) and the margin by which pulls missed it.
 - `check_rules_docs.py <WrathCombo repo root>`: checks docs/CustomRules.md against the code and bundled rule files: options, files, rule values and
   functions, target kinds. Numbers in the prose still need reading by hand.

@@ -68,6 +68,14 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   Mystery Magic (Phase 1 Kefka's last hit, Phase 2 Kefka targetable, the first Ultimate Embrace's cast and hit), and whether
   Revolting Ruin III #1 and #2 went to different tanks (the MT and OT); set SGE_ST_DPS's Phase 2 start block. `--actions
   [--me ids]` also lists your actions and the statuses you put on tanks from 14 to 40 s after that Mystery Magic.
+- `fflogs_top.py <spec> [--encounter 1085] [--metric rdps] [--n 10]`: an encounter's top FFLogs parses for a job, with the
+  `<code>/<fight>` that `fflogs_pull.sh` takes. Run without python -I.
+- `dmu_tank_mits.py <ACT log or folder> [...] [--job GNB,PLD] [--bust "RR3#1,HD#2"] [--clears] [--quiet]`: each tank's
+  tankbuster mitigation and invulnerabilities in Dancing Mad by slot (MT = Revolting Ruin III #1's target, OT = #2's):
+  per buster the hits taken, the presses in order (seconds after the buster's cast) and what was up at the hit; then each
+  pull's invulnerabilities per tank, and per job and slot how often each action was pressed for each buster. Reads real
+  ACT logs and FFLogs fights rebuilt by `fflogs_pull.sh`. Set DMU_Mit_GNB/DMU_Mit_PLD's buster windows and invulnerability
+  sets (2026-11-15).
 - `dmu_p2_presses.py <ACT log> <dalamud.log> [...] [--since 20261114] [--from 14] [--to 31]`: your presses through that gap from
   AnoMech's press log next to your ACT actions: custom-button presses, queued and rule-fired actions, and actions pressed on
   their own key (MANUAL). A press a rule turns into Wait is never logged. Tells "the rule did not fire" from "the button

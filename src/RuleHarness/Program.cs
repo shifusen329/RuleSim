@@ -752,6 +752,36 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         && gd["otP5OpenHol"] == s8[0] && gd["otHol8"] == "otP5OpenHol || " + s8[1]
         && gd["otHol"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"otHol{k}")) && dd["sambaWhen"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"s{k}")),
         string.Join(", ", Enumerable.Range(1, 10).Where(k => k != 8 && gd.GetValueOrDefault($"otHol{k}") != dd[$"s{k}"]).Select(k => $"otHol{k}")));
+    // 2026-11-15 (user: tankbuster mitigation aligned and invulnerabilities right for the slot; 16 top FFLogs clears, RuleSim
+    // scripts/dmu_tank_mits.py): Superbolide's Phase 3/5 set by the other tank's job (a Paladin takes the fifth Thunder III
+    // and second Orchestra, a Dark Knight the third and first, otherwise by slot); Thunder III #3/#5 (one tank, invulnerable)
+    // out of the other mitigation; Rampart and Camouflage together on #2 and #6; Heart of Corundum on Ultimate Embrace #2,
+    // not Wings #2. The Paladin plan: Hallowed Ground on its busters by slot, then Thunder III #5 and Orchestra #2.
+    {
+        double SetA(int opt, int ot, int pld, int drk) => Eval("bolideSetA", new()
+        {
+            ["bolideSetA"] = gd["bolideSetA"].Replace("partyJob(PLD)", "pld").Replace("partyJob(DRK)", "drk"),
+            ["optBolideSet"] = $"{opt}", ["ot"] = $"{ot}", ["pld"] = $"{pld}", ["drk"] = $"{drk}"
+        });
+        E2E("DMU_Mit_GNB: Superbolide's Phase 3/5 set A beside a Paladin, B beside a Dark Knight, else A as MT and B as OT; the option overrides",
+            SetA(0, 1, 1, 0) == 1 && SetA(0, 0, 1, 0) == 1 && SetA(0, 0, 0, 1) == 0 && SetA(0, 1, 0, 1) == 0 && SetA(0, 0, 0, 0) == 1 && SetA(0, 1, 0, 0) == 0
+            && SetA(1, 1, 0, 1) == 1 && SetA(2, 0, 1, 0) == 0 && gd["optBolideSet"] == "0"
+            && gd["bolideWhen"].Contains("castsSeen(ThunderIII) == if(bolideSetA, 3, 5)") && gd["bolideWhen"].Contains("castsSeen(MaddeningOrchestra) == if(bolideSetA, 1, 2)"),
+            $"{SetA(0, 1, 1, 0)} {SetA(0, 0, 0, 1)} {SetA(0, 1, 0, 0)}");
+        E2E("DMU_Mit_GNB: Thunder III #3/#5 get no other mitigation; Rampart and Camouflage on #2 and #6; Heart of Corundum not on Wings #2; Aurora on the MT for Revolting Ruin III #1 as OT",
+            gd["thunderSet"] == "castsSeen(ThunderIII) == 2 || castsSeen(ThunderIII) == 4 || castsSeen(ThunderIII) == 6" && gd["thunderMit"].StartsWith("thunderSet && ")
+            && gd["twentyBig"].EndsWith("|| thunderPair") && !gd.ContainsKey("wings2") && !gd["hocWhen"].Contains("Wings") && gd["hocWhen"].Contains("thunderSet && sinceCast(ThunderIII) >= 3.5")
+            && Id(R(planRules, "Aurora (other tank's Revolting Ruin III)")) == 16151 && Src(R(planRules, "Aurora (other tank's Revolting Ruin III)")).Contains("rr3a && ot"));
+        var pd = Defines("DMU_Mit_PLD.json");
+        var prs = RuleList(Rules("DMU_Mit_PLD.json"));
+        E2E("DMU_Mit_PLD: Hallowed Ground (optHallowedGround, off by default) first: Hyperdrive #2 as MT, Revolting Ruin III #2 as OT, Thunder III #5 and Orchestra #2 in either slot",
+            pd["optHallowedGround"] == "0" && Prop<string>(prs[0], "Name") == "Hallowed Ground (invulnerability busters)" && Src(prs[0]) == "hgWhen && noHg" && Id(prs[0]) == 30
+            && pd["hgWhen"].Contains("hdMine && castsSeen(LightOfJudgment) == 2") && pd["hgWhen"].Contains("ot && castsSeen(RevoltingRuinIII) == 2")
+            && pd["hgWhen"].Contains("castsSeen(ThunderIII) == 5") && pd["hgWhen"].Contains("castsSeen(MaddeningOrchestra) == 2"));
+        E2E("DMU_Mit_PLD: Thunder III #3/#5 get no other mitigation; Bulwark on Wings #2 in either slot; Holy Sheltron on Ultimate Embrace #2, not Wings #2",
+            pd["thunderMit"].StartsWith("thunderSet && ") && pd["bulwarkWhen"].Contains("castsSeen(WingsOfDestruction) == 2 && sinceCast(WingsOfDestruction) >= 1.2")
+            && !pd["sheltronWhen"].Contains("Wings") && pd["sheltronWhen"].Contains("thunderSet && sinceCast(ThunderIII) >= 3.0"));
+    }
     // The user (2026-11-01): No Mercy is held with Bloodfest at the end of Phase 1 under optP1BurstHoldHp, and (held, or
     // back after Phase 1's forced end at 198 s) until Phase 2's first 2-minute window, Forsaken + 13 s; meanwhile the
     // rotation counts down to that release. Same defines in both files.
@@ -953,7 +983,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         new[] { "GNB_ST.json", "GNB_AoE.json", "DMU_Mit_GNB.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Id(r)))));
     // The user's request (2026-10-23): Aurora last in the big-buster stack; Superbolide optional, off by default.
     E2E("GNB_ST / GNB_AoE never press Superbolide or Aurora", new[] { "GNB_ST.json", "GNB_AoE.json" }.All(f => RuleList(Rules(f)).All(r => Id(r) is not (16152 or 16151))));
-    var aurora = planRules.Single(r => Id(r) == 16151);
+    // Your own Aurora (the other tank's, for Revolting Ruin III #1 as OT, is checked with the 2026-11-15 changes).
+    var aurora = R(planRules, "Aurora (big busters, last)");
     E2E("DMU_Mit_GNB: Aurora last in the stack (after Heart of Corundum and the sheet's presses, once the stack is in), on you",
         planRules.IndexOf(aurora) > planRules.IndexOf(R(planRules, "Heart of Corundum (buster)")) && planRules.IndexOf(aurora) > planRules.IndexOf(R(planRules, "Heart of Light (plan)"))
         && planRules.IndexOf(aurora) > planRules.IndexOf(R(planRules, "Reprisal (plan)")) && Src(aurora).Contains("stackDone") && Src(aurora).Contains("bigMit")
@@ -978,7 +1009,7 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         var sb = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = slotValue, ["optSuperbolide"] = "1" }])!;
         E2E($"DMU_Mit_GNB compiles with optSuperbolide = 1, optTankSlot = {slotValue}", Errors(sb).Count == 0, string.Join(" | ", Errors(sb)));
     }
-    E2E("DMU_Mit_GNB.json: every option labelled with help", opts.Count == 8 && opts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
+    E2E("DMU_Mit_GNB.json: every option labelled with help", opts.Count == 9 && opts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
         string.Join(", ", opts.Select(o => Prop<string>(o, "Name"))));
 }
 
@@ -1043,8 +1074,11 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
     E2E("DMU_Mit_PLD: Guardian through Sentinel's hook, Intervention on the other tank", Prop<bool>(R(planRules, "Guardian (buster)"), "Hook") && Prop<uint>(R(planRules, "Guardian (buster)"), "ActionId") == 17
         && R(planRules, "Intervention (other tank's buster)").GetType().GetProperty("TargetSource")!.GetValue(R(planRules, "Intervention (other tank's buster)"))?.ToString() == "tank");
     var manual = new uint[] { 30, 7385, 27, 7533, 7537 }; // Hallowed Ground, Passage of Arms, Cover, Provoke, Shirk
-    E2E("PLD files never press Hallowed Ground, Passage of Arms, Cover, Provoke or Shirk",
-        new[] { "PLD_ST.json", "PLD_AoE.json", "DMU_Mit_PLD.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Prop<uint>(r, "ActionId")))));
+    // Hallowed Ground (2026-11-15): only the plan's one rule, behind optHallowedGround (default 0), as Superbolide is.
+    E2E("PLD files never press Passage of Arms, Cover, Provoke or Shirk; Hallowed Ground only in DMU_Mit_PLD behind optHallowedGround",
+        new[] { "PLD_ST.json", "PLD_AoE.json", "DMU_Mit_PLD.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Prop<uint>(r, "ActionId"))
+            || f == "DMU_Mit_PLD.json" && Prop<uint>(r, "ActionId") == 30 && Prop<string>(r, "WhenSource") == "hgWhen && noHg"))
+        && File.ReadAllText(Path.Combine(examples, "DMU_Mit_PLD.json")).Contains("\"hgWhen\": \"optHallowedGround && ("));
     // Bulwark (22) on the tankbusters (the user's request, 2026-10-22): the DMU plan's busters and the marker elsewhere.
     E2E("DMU_Mit_PLD presses Bulwark on the busters", Prop<uint>(R(planRules, "Bulwark (buster)"), "ActionId") == 22);
     // Interject and Low Blow on enemy casts (2026-11-05, user: "add it to all tank single target custom rules"): every tank

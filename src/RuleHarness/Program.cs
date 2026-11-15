@@ -748,7 +748,10 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     var dd = Defines("DMU_Mit_DNC.json");
     var s8 = dd["s8"].Split(" || ", 2);
     E2E("DMU_Mit_GNB: the OT's Heart of Light windows are DMU_Mit_DNC's Shield Samba windows s1-s10",
-        Enumerable.Range(1, 10).Where(k => k != 8).All(k => gd[$"otHol{k}"] == dd[$"s{k}"])
+        Enumerable.Range(1, 10).Where(k => k is not (3 or 8)).All(k => gd[$"otHol{k}"] == dd[$"s{k}"])
+        // 2026-11-15 (user: "Heart of Light appears to be going out too late in P2"): Forsaken's window is earlier than the
+        // Dancer's 5.4-6.3 s (whose Heart of Light landed on the hit), for Forsaken alone.
+        && gd["otHol3"] == "castsSeen(Forsaken) == 1 && sinceCast(Forsaken) >= 3.0 && sinceCast(Forsaken) < 5.6"
         && gd["otP5OpenHol"] == s8[0] && gd["otHol8"] == "otP5OpenHol || " + s8[1]
         && gd["otHol"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"otHol{k}")) && dd["sambaWhen"] == string.Join(" || ", Enumerable.Range(1, 10).Select(k => $"s{k}")),
         string.Join(", ", Enumerable.Range(1, 10).Where(k => k != 8 && gd.GetValueOrDefault($"otHol{k}") != dd[$"s{k}"]).Select(k => $"otHol{k}")));
@@ -987,7 +990,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         && Defines("PLD_ST.json")["fofCd"].Contains("holdBurst") && Defines("WAR_ST.json")["irSoon"].Contains("!holdBurst"),
         $"{burstFiles.Count} files; missing: {string.Join(", ", noTrash)}");
     E2E("DMU_Mit_GNB: the OT's last-chance Heart of Light is the Dancer's sambaLate (s2 whole), before the woven plan rule",
-        gd["otHolLate"].Replace("otHol", "s") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
+        gd["otHolLate"].Replace("otHol", "s").Replace("s3 && sinceCast(Forsaken) >= 4.8", "s3 && sinceCast(Forsaken) >= 5.8") == dd["sambaLate"].Replace("s2 && cd(TechnicalStep) < 1", "s2")
+        && gd["otHolLate"].Contains("otHol3 && sinceCast(Forsaken) >= 4.8")
         && planRules.IndexOf(R(planRules, holLast)) == planRules.IndexOf(R(planRules, "Heart of Light (plan)")) - 1
         && gd["holWhen"] == "optSheetMit && if(ot, otHol, mtHol)", gd.GetValueOrDefault("otHolLate") ?? "");
     E2E("DMU_Mit_GNB: no healing in the Accretions (Great Nebula, Heart of Corundum, Aurora)", planRules.Where(r => Id(r) is 16148 or 16161 or 16151).All(r => Src(r).Contains("!noHeal"))

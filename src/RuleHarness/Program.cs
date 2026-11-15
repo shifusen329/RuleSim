@@ -421,20 +421,22 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
     // tank, then Eukrasia for Eukrasian Dosis on his return; aggro resets there, so not by the boss's target): the off tank is
     // Revolting Ruin III #2's cast target, the main tank the one without that Taurochole; timed from the third Mystery Magic
     // (+23.8 s: both still up at the first Ultimate Embrace's hit, +38.9 s); Taurochole kept for it from 160 s; the first
-    // Ultimate Embrace left out of the boss's-target buster rules.
+    // Ultimate Embrace left out of the boss's-target buster rules. Taurochole and Haima ahead of the shields, and the shields
+    // on until Kefka is back (2026-11-14 22:30: the other tank was left bare when they stopped at +23.0 s).
     {
         var sgeSt = File.ReadAllText(Path.Combine(examples, "SGE_ST_DPS.json"));
-        var p2 = new[] { "Phase 2 start: Eukrasia for the tank shields", "Phase 2 start: Eukrasian Diagnosis on a tank",
-            "Phase 2 start: Taurochole on the off tank (Revolting Ruin III #2's)", "Phase 2 start: Rhizomata for that Taurochole",
+        var p2 = new[] { "Phase 2 start: Taurochole on the off tank (Revolting Ruin III #2's)", "Phase 2 start: Rhizomata for that Taurochole",
             "Phase 2 start: Haima on the main tank (the one without Taurochole)", "Phase 2 start: Haima on a tank (no Taurochole landed)",
+            "Phase 2 start: Eukrasia for the tank shields", "Phase 2 start: Eukrasian Diagnosis on a tank",
             "Phase 2 start: Eukrasia for Eukrasian Dosis on Kefka's return", "Phase 2 start: Eukrasian Dosis on Kefka's return",
             "Phase 2 start: hold the Eukrasia for Kefka" };
         var idx = p2.Select(n => sgeSt.IndexOf("\"name\": \"" + n + "\"")).ToList();
         string RuleText(string n) { var i = sgeSt.IndexOf("\"name\": \"" + n + "\""); return i < 0 ? "" : sgeSt.Substring(i, sgeSt.IndexOf('}', i) - i); }
         E2E("SGE_ST_DPS: Phase 2's start shields both tanks, Taurochole on Revolting Ruin III #2's tank, Haima on the other, then Eukrasian Dosis",
             idx.All(i => i > 0) && idx.SequenceEqual(idx.OrderBy(i => i)) && idx[0] < sgeSt.IndexOf("\"name\": \"Kardia on the boss's target\"")
-            && RuleText(p2[2]).Contains("\"target\": \"castTarget(RevoltingRuinIII) !Kerachole") && RuleText(p2[2]).Contains("!tankHas(2619)")
-            && RuleText(p2[4]).Contains("\"target\": \"tank !2619 !Haima !Panhaima") && RuleText(p2[4]).Contains("tankHas(2619) && !tankHas(Haima)")
+            && RuleText(p2[0]).Contains("\"target\": \"castTarget(RevoltingRuinIII) !Kerachole") && RuleText(p2[0]).Contains("!tankHas(2619)")
+            && RuleText(p2[2]).Contains("\"target\": \"tank !2619 !Haima !Panhaima") && RuleText(p2[2]).Contains("tankHas(2619) && !tankHas(Haima)")
+            && RuleText(p2[4]).Contains("\"when\": \"p2Gap && !hasTarget && !euk && tanksUnshielded >= 1\"")
             && sgeSt.Contains("\"p2Gap\": \"planZone && castsSeen(MysteryMagic) >= 3 && castsSeen(UltimateEmbrace) == 0 && sinceCast(MysteryMagic) >= 16.0\"")
             && sgeSt.Contains("castsSeen(UltimateEmbrace) == 0 && sinceCast(MysteryMagic) >= 23.8 || castsSeen(UltimateEmbrace) == 1 && ueBoth")
             && sgeSt.Contains("|| ueBoth && castsSeen(UltimateEmbrace) >= 2)) && !busterRuin")

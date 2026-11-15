@@ -66,6 +66,11 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   when it landed, and whether it was up for that tank's hit (on time, late, expired, or on someone not hit).
 - `dmu_p2_start.py <ACT log or folder> [...] [--since 20261020]`: Dancing Mad's Phase 1 to 2 transition timed from Phase 1's third
   Mystery Magic (Phase 1 Kefka's last hit, Phase 2 Kefka targetable, the first Ultimate Embrace's cast and hit), and whether
-  Revolting Ruin III #1 and #2 went to different tanks (the MT and OT); set SGE_ST_DPS's Phase 2 start block.
+  Revolting Ruin III #1 and #2 went to different tanks (the MT and OT); set SGE_ST_DPS's Phase 2 start block. `--actions
+  [--me ids]` also lists your actions and the statuses you put on tanks from 14 to 40 s after that Mystery Magic.
+- `dmu_p2_presses.py <ACT log> <dalamud.log> [...] [--since 20261114] [--from 14] [--to 31]`: your presses through that gap from
+  AnoMech's press log next to your ACT actions: custom-button presses, queued and rule-fired actions, and actions pressed on
+  their own key (MANUAL). A press a rule turns into Wait is never logged. Tells "the rule did not fire" from "the button
+  was not pressed".
 - `check_rules_docs.py <WrathCombo repo root>`: checks docs/CustomRules.md against the code and bundled rule files: options, files, rule values and
   functions, target kinds. Numbers in the prose still need reading by hand.

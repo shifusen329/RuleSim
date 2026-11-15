@@ -64,5 +64,8 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
 - `dmu_ue_taurochole.py <ACT log or folder> [...] [--since 20261110] [--cast "Ultimate Embrace"] [--n 1]`: your Sage's Taurochole
   against the Nth cast of a Dancing Mad tankbuster: when the hit landed on each tank, when you pressed Taurochole, on whom,
   when it landed, and whether it was up for that tank's hit (on time, late, expired, or on someone not hit).
+- `dmu_p2_start.py <ACT log or folder> [...] [--since 20261020]`: Dancing Mad's Phase 1 to 2 transition timed from Phase 1's third
+  Mystery Magic (Phase 1 Kefka's last hit, Phase 2 Kefka targetable, the first Ultimate Embrace's cast and hit), and whether
+  Revolting Ruin III #1 and #2 went to different tanks (the MT and OT); set SGE_ST_DPS's Phase 2 start block.
 - `check_rules_docs.py <WrathCombo repo root>`: checks docs/CustomRules.md against the code and bundled rule files: options, files, rule values and
   functions, target kinds. Numbers in the prose still need reading by hand.

@@ -882,6 +882,13 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             && Src(R(gr, "Burst Strike before No Mercy")).StartsWith("!stdOpen && ")
             && Src(R(gr, "Gnashing Fang (standard opener: after the window)")).StartsWith("stdOpen && !nmUp && gfReady && cd(NoMercy) > 30")
             && Ix("Gnashing Fang (standard opener: after the window)") < Ix("Solid Barrel") && gst["stdOpen"] == "optStandardOpener && inCombat && combatTime < 40");
+        // 2026-11-15 (user: "Why is sonic break going out so late during the 1 minute burst?"): at 2.50 Sonic Break opens the
+        // No Mercy window (the top 12 Gunbreakers' clears: first in 137 of 228 windows) instead of going 8th at +18.7-19.4 s,
+        // where it slipped out of the window; the standard opener keeps its own order, a faster GCD the late rule.
+        E2E("GNB_ST: Sonic Break first in No Mercy at 2.50 (before Double Down and the combos), not in the standard opener",
+            Ix("Sonic Break (first in No Mercy)") > Ix("Gnashing Fang (standard opener: first in No Mercy)") && Ix("Sonic Break (first in No Mercy)") < Ix("Double Down")
+            && Src(R(gr, "Sonic Break (first in No Mercy)")) == "!stdOpen && !fast && nmUp && canBreak && hasTarget && inMelee"
+            && Ix("Sonic Break") > Ix("Gnashing Fang (in No Mercy)"));
     }
 
     // ---- Per-cooldown "Hold ... under target HP %" options (the user, 2026-11-03): off (0) by default, any fight ----

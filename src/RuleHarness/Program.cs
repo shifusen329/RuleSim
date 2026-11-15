@@ -737,7 +737,7 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     E2E("DMU_Mit_GNB: Rampart (7531) and Camouflage (16140) on the busters", planRules.Count(r => Id(r) == 7531) == 2 && planRules.Count(r => Id(r) == 16140) == 2);
     var holLast = "Heart of Light (plan, last chance)";
     E2E("DMU_Mit_GNB: all woven except the OT's Phase 5 Heart of Light (no target, downtime) and its last-chance Heart of Light",
-        planRules.Where(r => Prop<string>(r, "Name") is not ("Heart of Light (Phase 5, before Kefka is targetable)" or "Heart of Light (plan, last chance)")).All(r => Prop<bool>(r, "Weave"))
+        planRules.Where(r => Prop<string>(r, "Name") is not ("Heart of Light (Phase 5, before Kefka is targetable)" or "Heart of Light (plan, last chance)" or "Sprint (Wings of Destruction bait, last chance)")).All(r => Prop<bool>(r, "Weave"))
         && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("!hasTarget") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("ot") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("optP5EarlyHol")
         && Src(R(planRules, holLast)) == "optSheetMit && ot && otHolLate" && Id(R(planRules, holLast)) == 16160);
     // The user (2026-11-01): as OT, Heart of Light follows the Dancer's Shield Samba (same 15 s, same 90 s cooldown):
@@ -774,6 +774,15 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             && Id(R(planRules, "Aurora (other tank's Revolting Ruin III)")) == 16151 && Src(R(planRules, "Aurora (other tank's Revolting Ruin III)")).Contains("rr3a && ot"));
         var pd = Defines("DMU_Mit_PLD.json");
         var prs = RuleList(Rules("DMU_Mit_PLD.json"));
+        // 2026-11-15 (user: "I need sprint to get to my Wings bait location at the end of P2"): Sprint (action 3) from the first
+        // Wings +8.0 s, woven, and at once in the second Wings' first second; not while Sprint (status 50) is up.
+        E2E("DMU_Mit_GNB: Sprint for the Wings of Destruction bait (optWingsSprint, on): woven from the first Wings +8 s, at once as the second starts",
+            gd["optWingsSprint"] == "1" && Id(R(planRules, "Sprint (Wings of Destruction bait)")) == 3 && Prop<bool>(R(planRules, "Sprint (Wings of Destruction bait)"), "Weave")
+            && Src(R(planRules, "Sprint (Wings of Destruction bait)")) == "wingsSprint" && Id(R(planRules, "Sprint (Wings of Destruction bait, last chance)")) == 3
+            && !Prop<bool>(R(planRules, "Sprint (Wings of Destruction bait, last chance)"), "Weave")
+            && Src(R(planRules, "Sprint (Wings of Destruction bait, last chance)")) == "wingsSprint && castsSeen(WingsOfDestruction) == 2"
+            && gd["wingsSprint"].Contains("castsSeen(WingsOfDestruction) == 1 && sinceCast(WingsOfDestruction) >= 8.0") && gd["wingsSprint"].EndsWith("&& !buff(50)")
+            && planRules.IndexOf(R(planRules, "Sprint (Wings of Destruction bait)")) < planRules.IndexOf(R(planRules, "Great Nebula (buster)")));
         E2E("DMU_Mit_PLD: Hallowed Ground (optHallowedGround, off by default) first: Hyperdrive #2 as MT, Revolting Ruin III #2 as OT, Thunder III #5 and Orchestra #2 in either slot",
             pd["optHallowedGround"] == "0" && Prop<string>(prs[0], "Name") == "Hallowed Ground (invulnerability busters)" && Src(prs[0]) == "hgWhen && noHg" && Id(prs[0]) == 30
             && pd["hgWhen"].Contains("hdMine && castsSeen(LightOfJudgment) == 2") && pd["hgWhen"].Contains("ot && castsSeen(RevoltingRuinIII) == 2")
@@ -1016,7 +1025,7 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         var sb = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = slotValue, ["optSuperbolide"] = "1" }])!;
         E2E($"DMU_Mit_GNB compiles with optSuperbolide = 1, optTankSlot = {slotValue}", Errors(sb).Count == 0, string.Join(" | ", Errors(sb)));
     }
-    E2E("DMU_Mit_GNB.json: every option labelled with help", opts.Count == 9 && opts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
+    E2E("DMU_Mit_GNB.json: every option labelled with help", opts.Count == 10 && opts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
         string.Join(", ", opts.Select(o => Prop<string>(o, "Name"))));
 }
 

@@ -773,7 +773,10 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             $"{SetA(0, 1, 1, 0)} {SetA(0, 0, 0, 1)} {SetA(0, 1, 0, 0)}");
         E2E("DMU_Mit_GNB: Thunder III #3/#5 get no other mitigation; Rampart and Camouflage on #2 and #6; Heart of Corundum not on Wings #2; Aurora on the MT for Revolting Ruin III #1 as OT",
             gd["thunderSet"] == "castsSeen(ThunderIII) == 2 || castsSeen(ThunderIII) == 4 || castsSeen(ThunderIII) == 6" && gd["thunderMit"].StartsWith("thunderSet && ")
-            && gd["twentyBig"].EndsWith("|| thunderPair") && !gd.ContainsKey("wings2") && !gd["hocWhen"].Contains("Wings") && gd["hocWhen"].Contains("thunderSet && sinceCast(ThunderIII) >= 3.5")
+            && gd["twentyBig"].EndsWith("|| thunderPair || hd1Pre") && !gd.ContainsKey("wings2")
+            // 2026-11-15 ("No Mercy drift in P1"): as OT, Rampart and Camouflage 4 s before Hyperdrive #1's Light of Judgment
+            // (9.0-9.1 s after the second Mystery Magic), so the stack doesn't take Bloodfest's and No Mercy's slots.
+            && gd["hd1Pre"] == "ot && castsSeen(MysteryMagic) == 2 && castsSeen(LightOfJudgment) == 0 && sinceCast(MysteryMagic) >= 5.0" && !gd["hocWhen"].Contains("Wings") && gd["hocWhen"].Contains("thunderSet && sinceCast(ThunderIII) >= 3.5")
             && Id(R(planRules, "Aurora (other tank's Revolting Ruin III)")) == 16151 && Src(R(planRules, "Aurora (other tank's Revolting Ruin III)")).Contains("rr3a && ot"));
         var pd = Defines("DMU_Mit_PLD.json");
         var prs = RuleList(Rules("DMU_Mit_PLD.json"));

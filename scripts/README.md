@@ -53,7 +53,8 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   pressed for Dancing Mad's Phase 3 Accretions (Earthquake): every heal or shield on players from the cast to 3 s after the
   second Accretion came off, whose heal removed each and when, the party's HP just before; summary of the presses between
   the Accretions landing and the first removal. --not-healer: Earthquakes where you weren't a healer; --clean: ones that
-  reached Black Hole with nobody dead (2026-11-16).
+  reached Black Hole with nobody dead (2026-11-16). --mits adds every mitigation press from 30 s before the cast and what
+  was up at the first pulse (party mitigation and shields, debuffs on Chaos), with a count over the Earthquakes.
 - `dmu_earthquake.py <ACT log or folder> [...] [--since 20261024] [--list]`: every Phase 3 Earthquake in Dancing Mad: the two Accretion
   holders' lines, when and by whose heal each came off, the lowest tank HP and how many others were under 45% at that moment, every
   earth-crystal pulse (what set it off, its largest hit as % of max HP) and the tank auto-attacks; the totals set the healer plans'

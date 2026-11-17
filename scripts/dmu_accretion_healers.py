@@ -11,16 +11,86 @@ Accretion's removal (whose heal, the holder's own or not); and just before each,
 --not-healer keeps Earthquakes where you were not a healer; --clean those that reached Black Hole with nobody dead.
 The summary: what the healers pressed between the Accretions landing (+7.4 s) and the first coming off, how many of them
 healed the whole party, when and by whom each came off, and the party's HP at the first.
+
+--mits (2026-11-16) adds the mitigation: every mitigation press by anyone from 30 s before the cast to 3 s after the second
+Accretion came off, and what was up when the first pulse landed: party mitigation and shields (the number of players with
+each) and debuffs on Chaos, whose Earthquake the pulse is (Reprisal, Addle, Feint, Dismantle). The summary counts, over the
+Earthquakes, how often each was up at the first pulse.
 """
 import collections
+import datetime as dt
+import mmap
 import os
 import re
 import statistics
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dmu_black_hole import effects  # noqa: E402
+from dmu_black_hole import effects, seek_time, ts  # noqa: E402
 from dmu_earthquake import scan, analyse  # noqa: E402
+
+MIT_STATUS = {'Kerachole', 'Holos', 'Holosakos', 'Panhaima', 'Sacred Soil', 'Fey Illumination', 'Seraphic Illumination',
+              'Desperate Measures', 'Temperance', 'Divine Caress', 'Collective Unconscious', 'Sun Sign', 'Shield Samba',
+              'Troubadour', 'Tactician', 'Magick Barrier', 'Dark Missionary', 'Heart of Light', 'Divine Veil',
+              'Passage of Arms', 'Shake It Off', 'Tempera Grassa', 'Radiant Aegis', 'Galvanize', 'Catalyze',
+              'Eukrasian Prognosis', 'Seraphism', 'Intersection', 'Exaltation', 'Aquaveil', 'Divine Benison',
+              'Improvised Finish', 'Rampart', 'Vengeance', 'Damnation', 'Shadowed Vigil', 'Guardian', 'Great Nebula',
+              'Holy Sheltron', 'Bloodwhetting', 'The Blackest Night', 'Oblation', 'Heart of Corundum', 'Camouflage',
+              'Liturgy of the Bell', 'Thrill of Battle', 'Dark Mind', 'Bulwark'}
+DEBUFFS = {'Reprisal', 'Addle', 'Feint', 'Dismantle'}
+MIT_PRESS = {'Kerachole', 'Holos', 'Panhaima', 'Sacred Soil', 'Fey Illumination', 'Seraphism', 'Expedient', 'Temperance',
+             'Divine Caress', 'Collective Unconscious', 'Sun Sign', 'Shield Samba', 'Troubadour', 'Tactician',
+             'Magick Barrier', 'Dark Missionary', 'Heart of Light', 'Divine Veil', 'Passage of Arms', 'Shake It Off',
+             'Tempera Grassa', 'Tempera Coat', 'Radiant Aegis', 'Reprisal', 'Addle', 'Feint', 'Dismantle',
+             'Liturgy of the Bell', 'Eukrasian Prognosis II', 'Concitation', 'Accession', 'Celestial Intersection',
+             'Exaltation', 'Aquaveil', 'Divine Benison', 'Improvised Finish', 'Neutral Sect', 'Rampart', 'Vengeance',
+             'Damnation', 'Shadowed Vigil', 'Sentinel', 'Guardian', 'Great Nebula', 'Holy Sheltron', 'Bloodwhetting',
+             'The Blackest Night', 'Oblation', 'Heart of Corundum', 'Camouflage', 'Thrill of Battle', 'Dark Mind',
+             'Bulwark', 'Holmgang', 'Living Dead', 'Superbolide', 'Hallowed Ground'}
+
+
+def mit_window(path, T, end):
+    """Mitigation presses and status changes from 30 s before T to end seconds after it."""
+    presses, status = [], []
+    with open(path, 'rb') as fh:
+        mm = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
+        o = seek_time(mm, 0, len(mm), T - dt.timedelta(seconds=32))
+        while o < len(mm):
+            e = mm.find(b'\n', o)
+            e = len(mm) if e < 0 else e
+            raw = mm[o:e]
+            o = e + 1
+            if raw[:3] not in (b'21|', b'22|', b'26|', b'30|'):
+                continue
+            x = raw.decode('utf-8', 'replace').rstrip('\r').split('|')
+            try:
+                r = (ts(x[1]) - T).total_seconds()
+            except (IndexError, ValueError):
+                continue
+            if r < -30:
+                continue
+            if r > end:
+                break
+            if x[0] in ('21', '22') and x[2][:1] == '1' and x[5] in MIT_PRESS:
+                if not presses or presses[-1][1:3] != (x[3], x[5]) or r - presses[-1][0] > 1:
+                    presses.append((r, x[3], x[5], x[7]))
+            elif x[0] in ('26', '30') and len(x) > 8 and (x[3] in MIT_STATUS or x[3] in DEBUFFS):
+                status.append((r, x[0] == '26', x[3], x[7], x[8]))
+        mm.close()
+    return presses, status
+
+
+def up_at(status, r0):
+    """{status: set of holders} at r0."""
+    on = collections.defaultdict(set)
+    for r, gain, name, tgt, tname in status:
+        if r > r0:
+            break
+        if gain:
+            on[name].add((tgt, tname))
+        else:
+            on[name].discard((tgt, tname))
+    return on
 
 HEALERS = {'WHM', 'SCH', 'AST', 'SGE'}
 TANKS = {'PLD', 'WAR', 'DRK', 'GNB'}
@@ -29,7 +99,9 @@ SKIP = {'attack', 'Sprint', 'Swiftcast', 'Lucid Dreaming', 'Surecast', 'Rescue',
 
 def main():
     args = sys.argv[1:]
-    me, since, paths, not_healer, clean, quiet = {'10041112', '1001A4A8'}, None, [], False, False, False
+    me, since, paths, not_healer, clean, quiet, mits = {'10041112', '1001A4A8'}, None, [], False, False, False, False
+    mit_up = collections.Counter()       # Earthquakes with each mitigation up at the first pulse (party: on 4+ players)
+    mit_n = 0
     i = 0
     while i < len(args):
         a = args[i]
@@ -39,10 +111,11 @@ def main():
         elif a == '--since':
             since = args[i + 1]
             i += 2
-        elif a in ('--not-healer', '--clean', '--quiet'):
+        elif a in ('--not-healer', '--clean', '--quiet', '--mits'):
             not_healer |= a == '--not-healer'
             clean |= a == '--clean'
             quiet |= a == '--quiet'
+            mits |= a == '--mits'
             i += 1
         else:
             paths.append(a)
@@ -181,6 +254,27 @@ def main():
                     pre[f"{healers.get(x[1])} {name}{' (party)' if party else ''}"] += 1
                 if not quiet:
                     print(f'   {r:+6.1f}  {healers.get(x[1])} {src}: {txt}')
+            if mits:
+                presses, status = mit_window(path, T, end)
+                p0 = next((p[0] for p in res['pulses']), None)
+                if not quiet:
+                    print('   mitigation pressed (s after the cast): ' + '; '.join(
+                        f"{r:+.1f} {jobs.get(next((i for i, nm in names.items() if nm == who), ''), '?')} {nm}"
+                        + (f" -> {tg.split()[0]}" if tg and tg != who and nm not in ('Reprisal', 'Addle', 'Feint', 'Dismantle') else '')
+                        for r, who, nm, tg in presses if r <= end))
+                if p0 is not None:
+                    mit_n += 1
+                    on = up_at(status, p0)
+                    party = {k: len(v) for k, v in on.items() if k in MIT_STATUS and len(v) >= 4}
+                    single = {k: len(v) for k, v in on.items() if k in MIT_STATUS and 0 < len(v) < 4}
+                    deb = {k: ', '.join(sorted({t for _, t in v})) for k, v in on.items() if k in DEBUFFS and v}
+                    for k in party:
+                        mit_up[f'{k} (party)'] += 1
+                    for k, v in on.items():
+                        if k in DEBUFFS and any(t in ('Chaos',) for _, t in v):
+                            mit_up[f'{k} on Chaos'] += 1
+                    if not quiet:
+                        print(f"   up at the first pulse (+{p0:.1f}): party {party or '-'}; few {single or '-'}; on enemies {deb or '-'}")
             if first_party is not None:
                 first_heal.append(first_party)
             pre_party.append(sum(1 for r, x in merged if not isinstance(x, str) and len(groups[x]) >= 3 and land <= r < min(offs.values())))
@@ -196,6 +290,10 @@ def main():
     print('healer presses between landing and the first off:')
     for k, v in pre.most_common(25):
         print(f'   {v:4}  {k}')
+    if mits:
+        print(f'up at the first pulse, of {mit_n} Earthquakes (party = on 4+ players):')
+        for k, v in mit_up.most_common(30):
+            print(f'   {v:4}  {k}')
 
 
 if __name__ == '__main__':

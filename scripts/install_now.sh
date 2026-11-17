@@ -22,16 +22,23 @@ echo "backup: plugin dll/pdb + $(ls "$BACKUP/rules" | wc -l) rule files in $BACK
 
 if running; then
   mark=$(stat -c %s "$DLOG")
+  # The plugin writes its config as it reloads. Dalamud stops writing dalamud.log once it reaches 100 MB (2026-11-17: capped
+  # at 00:41, so the 12:18 reload never showed there; WrathCombo.json was rewritten 3 s after the copy), so either counts.
+  CFG="$APPDATA/XIVLauncher/pluginConfigs/WrathCombo.json"
+  cfg0=$(stat -c %Y "$CFG" 2>/dev/null || echo 0)
   cp "$STAGE/WrathCombo.pdb" "$LIVE_PLUGIN/WrathCombo.pdb"
   cp "$STAGE/WrathCombo.dll" "$LIVE_PLUGIN/WrathCombo.dll"
+  copied=$(date +%s)
   echo "COPIED $(date +%T); waiting for the reload"
   loaded=0
   for _ in $(seq 1 60); do
     sleep 1
     tail -c +$((mark + 1)) "$DLOG" | grep -aq "Finished loading WrathCombo" && { loaded=1; break; }
+    cfg=$(stat -c %Y "$CFG" 2>/dev/null || echo 0)
+    [ "$cfg" -ne "$cfg0" ] && [ "$cfg" -ge "$copied" ] && { sleep 3; loaded=1; echo "reload seen: WrathCombo.json written $(date -d @$cfg +%T)"; break; }
   done
   tail -c +$((mark + 1)) "$DLOG" | grep -a "WrathCombo" | grep -a -E "LocalPlugin|ERR" | head -20
-  [ $loaded = 1 ] || echo "WARNING: no 'Finished loading WrathCombo' within 60 s; rule files not copied"
+  [ $loaded = 1 ] || echo "WARNING: no 'Finished loading WrathCombo' nor a WrathCombo.json write within 60 s; rule files not copied"
   [ $loaded = 1 ] || exit 3
 else
   cp "$STAGE/WrathCombo.pdb" "$LIVE_PLUGIN/WrathCombo.pdb"

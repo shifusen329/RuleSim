@@ -443,6 +443,23 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
             && System.Text.RegularExpressions.Regex.Matches(sgeSt, "\"action\": \"Taurochole\"[^}]*!ue1TauroKeep").Count == 4,
             string.Join(" ", idx));
     }
+    // Earthquake's shield, Pepsis and fresh shield (2026-11-16, user: "build it"): Eukrasian Prognosis II 3.2-7.2 s into the
+    // cast (Earthquake deals no damage, so it is whole at the drop to 1 HP), Pepsis after the drop, then a fresh shield ahead
+    // of the tanks' GCD heals (their oGCD heals still first); never filling a holder (accNoFill).
+    {
+        string Rule(string n) { var i = sgePlan.IndexOf("\"name\": \"" + n + "\""); return i < 0 ? "" : sgePlan.Substring(i, sgePlan.IndexOf('}', i) - i); }
+        int At(string n) => sgePlan.IndexOf("\"name\": \"" + n + "\"");
+        E2E("DMU_Mit_SGE: Earthquake shield before the drop, Pepsis after it, a fresh shield ahead of the tanks' GCD heals",
+            sgePlan.Contains("\"optEqShield\": \"1\"") && sgePlan.Contains("sinceCast(Earthquake) >= 3.2 && sinceCast(Earthquake) < 7.2 && !accretion")
+            && Rule("Earthquake: Pepsis after the drop").Contains("\"action\": \"Pepsis\"")
+            && sgePlan.Contains("accretion && justUsed(EukrasianPrognosis2, 10) && partyWith(EukrasianPrognosis) >= 50 && accNoFill")
+            && sgePlan.Contains("justUsed(Pepsis, 6) && partyUnshielded >= 4 && accNoFill")
+            && At("Earthquake: Diagnosis on Second in Line's Accretion") < At("Earthquake: Eukrasia for the party shield before the drop")
+            && At("Earthquake: Pepsis after the drop") < At("Earthquake: Taurochole on a tank under the Crust line")
+            && At("Earthquake: Krasis on a tank under the Crust line (no Accretion left)") < At("Earthquake: Eukrasia for a fresh party shield after Pepsis")
+            && At("Earthquake: Eukrasian Prognosis II after Pepsis") < At("Earthquake: Eukrasia for a tank under the Crust line")
+            && Rule("Earthquake: Eukrasian Prognosis II before the drop").Contains("\"hook\": true"));
+    }
     E2E("DMU_Mit_SGE: Accretion Krasis only with time left for the heal",
         sgePlan.Contains("\"accKrasis1\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3004)) || playerHp < 70)\"")
         && sgePlan.Contains("\"accKrasis2\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3005)) || playerHp < 70)\"")

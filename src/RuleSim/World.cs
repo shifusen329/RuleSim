@@ -158,6 +158,20 @@ internal sealed class World
     public static bool IsHealer(Actor a) => a.Job is 24 or 28 or 33 or 40 or 6 or 26;
     public static string RoleOf(Actor a) => IsTank(a) ? "tank" : IsHealer(a) ? "healer" : "dps";
 
+    /// <summary> The job's abbreviation (as Wrath's partyJob reads it); "" for a class or an unknown id. </summary>
+    public static string JobAbbr(Actor a) => (int)a.Job switch
+    {
+        19 => "PLD", 20 => "MNK", 21 => "WAR", 22 => "DRG", 23 => "BRD", 24 => "WHM", 25 => "BLM", 27 => "SMN", 28 => "SCH",
+        30 => "NIN", 31 => "MCH", 32 => "DRK", 33 => "AST", 34 => "SAM", 35 => "RDM", 36 => "BLU", 37 => "GNB", 38 => "DNC",
+        39 => "RPR", 40 => "SGE", 41 => "VPR", 42 => "PCT", _ => "",
+    };
+
+    /// <summary> hpWithRole's role argument (tank, healer or dps; plurals too), as RoleOf names them; null for anything else. </summary>
+    public static string? RoleArg(string name) => name.Trim().ToLowerInvariant() switch
+    {
+        "tank" or "tanks" => "tank", "healer" or "healers" => "healer", "dps" => "dps", _ => null,
+    };
+
     public bool Dead(Actor a, int t) =>
         R.Deaths.Any(d => d.Victim.Id == a.Id && d.T <= t && (d.RaisedMs < 0 || t < d.RaisedMs));
 

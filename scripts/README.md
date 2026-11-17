@@ -49,6 +49,11 @@ Shareable analysis and run scripts (the user, 2026-11-03: every shareable script
   `--order`: each player's seat (role + First/Second/Third in Line, Accretion holders their own role) and, per laser set, who
   took a tether and who was clipped standing in a laser, against BossMod's D>S>A / S>D>A seatings.
   `--detail N` dumps one Black Hole: enemy casts and hits, mechanic statuses, deaths, your actions.
+- `dmu_accretion_healers.py <ACT log or folder> [...] [--since 20261020] [--not-healer] [--clean] [--quiet]`: what the healers
+  pressed for Dancing Mad's Phase 3 Accretions (Earthquake): every heal or shield on players from the cast to 3 s after the
+  second Accretion came off, whose heal removed each and when, the party's HP just before; summary of the presses between
+  the Accretions landing and the first removal. --not-healer: Earthquakes where you weren't a healer; --clean: ones that
+  reached Black Hole with nobody dead (2026-11-16).
 - `dmu_earthquake.py <ACT log or folder> [...] [--since 20261024] [--list]`: every Phase 3 Earthquake in Dancing Mad: the two Accretion
   holders' lines, when and by whose heal each came off, the lowest tank HP and how many others were under 45% at that moment, every
   earth-crystal pulse (what set it off, its largest hit as % of max HP) and the tank auto-attacks; the totals set the healer plans'

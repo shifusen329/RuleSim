@@ -71,6 +71,11 @@ def back(mm, pat, end, stop, test):
     while True:
         p = mm.rfind(pat, stop, end)
         if p < 0:
+            # The file's first line has no newline before it (FFLogs fights rebuilt by convert.py start with their 01 line).
+            if stop == 0 and pat[:1] == b'\n' and mm[:len(pat) - 1] == pat[1:] and end > 0:
+                l = mm[:mm.find(b'\n')].decode('utf-8', 'replace').rstrip('\r').split('|')
+                if test(l):
+                    return l, -1
             return None, -1
         l = mm[p + 1:mm.find(b'\n', p + 1)].decode('utf-8', 'replace').rstrip('\r').split('|')
         if test(l):

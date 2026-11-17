@@ -463,6 +463,11 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
             && sgeSt2.Contains(prep) && sgeSt2.Contains("progShieldsDown && !eqHold && !eqPrep")
             && sgeSt2.Contains("partyAvgHp < optIxocholeHp && !eqHold && !eqPrep") && sgeSt2.Contains("partyBelow(optIxocholeHp) >= min(3, partyAlive - 1) && !eqHold && !eqPrep"));
     }
+    // The third Trap (2026-11-17, user: "Do it"): no Eukrasia held for it; its shield window in two parts, before the Trap
+    // (Graven Image #3 + 3.0-4.8 s) and after it (+7.8-12), so the GCD keeps going through the Trap.
+    E2E("DMU_Mit_SGE: the third Trap's shield before it and after it, no Eukrasia held through it",
+        sgePlan.Contains("\"dtt3Shield\": \"castsSeen(GravenImage) == 3 && (sinceCast(GravenImage) >= 3 && sinceCast(GravenImage) < 4.8 || sinceCast(GravenImage) >= 7.8 && sinceCast(GravenImage) < 12)\"")
+        && sgePlan.Contains("\"shieldPre\": \"dtt1Pre || dtt2Pre || ub9Pre ||"));
     E2E("DMU_Mit_SGE: Accretion Krasis only with time left for the heal",
         sgePlan.Contains("\"accKrasis1\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3004)) || playerHp < 70)\"")
         && sgePlan.Contains("\"accKrasis2\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3005)) || playerHp < 70)\"")

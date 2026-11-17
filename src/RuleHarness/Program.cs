@@ -443,22 +443,25 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
             && System.Text.RegularExpressions.Regex.Matches(sgeSt, "\"action\": \"Taurochole\"[^}]*!ue1TauroKeep").Count == 4,
             string.Join(" ", idx));
     }
-    // Earthquake's shield, Pepsis and fresh shield (2026-11-16, user: "build it"): Eukrasian Prognosis II 3.2-7.2 s into the
-    // cast (Earthquake deals no damage, so it is whole at the drop to 1 HP), Pepsis after the drop, then a fresh shield ahead
-    // of the tanks' GCD heals (their oGCD heals still first); never filling a holder (accNoFill).
+    // Earthquake (2026-11-16, user: "Make the change"): Ixochole as everyone drops to 1 HP (Rhizomata first if needed), under
+    // the sheet's Zoe'd Eukrasian Prognosis II from The Decisive Battle (nothing hits the party in between; Earthquake deals no
+    // damage), ahead of the tanks' heals, never filling a holder; from the end of the ninth Ultima Blaster's shield window to
+    // Earthquake, Ixochole is kept and no party shield goes out that would keep the Zoe'd one off (both files).
     {
         string Rule(string n) { var i = sgePlan.IndexOf("\"name\": \"" + n + "\""); return i < 0 ? "" : sgePlan.Substring(i, sgePlan.IndexOf('}', i) - i); }
         int At(string n) => sgePlan.IndexOf("\"name\": \"" + n + "\"");
-        E2E("DMU_Mit_SGE: Earthquake shield before the drop, Pepsis after it, a fresh shield ahead of the tanks' GCD heals",
-            sgePlan.Contains("\"optEqShield\": \"1\"") && sgePlan.Contains("sinceCast(Earthquake) >= 3.2 && sinceCast(Earthquake) < 7.2 && !accretion")
-            && Rule("Earthquake: Pepsis after the drop").Contains("\"action\": \"Pepsis\"")
-            && sgePlan.Contains("accretion && justUsed(EukrasianPrognosis2, 10) && partyWith(EukrasianPrognosis) >= 50 && accNoFill")
-            && sgePlan.Contains("justUsed(Pepsis, 6) && partyUnshielded >= 4 && accNoFill")
-            && At("Earthquake: Diagnosis on Second in Line's Accretion") < At("Earthquake: Eukrasia for the party shield before the drop")
-            && At("Earthquake: Pepsis after the drop") < At("Earthquake: Taurochole on a tank under the Crust line")
-            && At("Earthquake: Krasis on a tank under the Crust line (no Accretion left)") < At("Earthquake: Eukrasia for a fresh party shield after Pepsis")
-            && At("Earthquake: Eukrasian Prognosis II after Pepsis") < At("Earthquake: Eukrasia for a tank under the Crust line")
-            && Rule("Earthquake: Eukrasian Prognosis II before the drop").Contains("\"hook\": true"));
+        var sgeSt2 = File.ReadAllText(Path.Combine(examples, "SGE_ST_DPS.json"));
+        var prep = "\"eqPrep\": \"zone == 1363 && castsSeen(VacuumWave) == 1 && castsSeen(Earthquake) == 0 && sinceCast(VacuumWave) >= 22.1\"";
+        E2E("DMU_Mit_SGE: Ixochole at Earthquake's drop to 1 HP, ahead of the tanks' heals; Ixochole and party shields held from the ninth Ultima Blaster",
+            sgePlan.Contains("\"optEqIxochole\": \"1\"") && !sgePlan.Contains("Pepsis")
+            && sgePlan.Contains("sinceCast(Earthquake) >= 7.2 && sinceCast(Earthquake) < 12 && accretion && accNoFill && !justUsed(Ixochole, 5)")
+            && Rule("Earthquake: Ixochole at the drop").Contains("\"when\": \"eqIxo && gall >= 1\"")
+            && Rule("Earthquake: Rhizomata for that Ixochole").Contains("eqIxo && gall == 0 && ready(Ixochole)")
+            && At("Earthquake: Diagnosis on Second in Line's Accretion") < At("Earthquake: Ixochole at the drop")
+            && At("Earthquake: Rhizomata for that Ixochole") < At("Earthquake: Taurochole on a tank under the Crust line")
+            && sgePlan.Contains(prep) && sgePlan.Contains("tankHp >= 50 && !eqPrep))")
+            && sgeSt2.Contains(prep) && sgeSt2.Contains("progShieldsDown && !eqHold && !eqPrep")
+            && sgeSt2.Contains("partyAvgHp < optIxocholeHp && !eqHold && !eqPrep") && sgeSt2.Contains("partyBelow(optIxocholeHp) >= min(3, partyAlive - 1) && !eqHold && !eqPrep"));
     }
     E2E("DMU_Mit_SGE: Accretion Krasis only with time left for the heal",
         sgePlan.Contains("\"accKrasis1\": \"sinceCast(Earthquake) < 18.0 && (!(buffAny(1604) && buffAny(3004)) || playerHp < 70)\"")

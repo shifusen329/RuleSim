@@ -42,7 +42,17 @@ internal static class PeerCommands
     private static IEnumerable<string> LogsIn(string dir, string from, string only) => Directory.GetFiles(dir, "Network_*.log")
         .Where(f => string.Compare(Path.GetFileNameWithoutExtension(f)[^8..], from, StringComparison.Ordinal) >= 0 && (only == "" || f.Contains(only)));
 
-    private sealed record Seg(string Phase, int Order, double Dmg, double Sec, bool Died, int Gcds);
+    private sealed record Seg(string Phase, int Order, double Dmg, double Sec, bool Died, int Gcds, double BuffFree, int HealGcds, Dictionary<string, int> HealNames);
+
+    private static HashSet<uint>? gcdActions;
+    /// <summary> Weaponskills and spells (ActionCategory 2/3; action_cat.csv from the game data). </summary>
+    private static HashSet<uint> GcdActions()
+    {
+        if (gcdActions is not null) return gcdActions;
+        var p = Path.Combine(AppContext.BaseDirectory, "action_cat.csv");
+        if (!File.Exists(p)) p = Path.Combine(Directory.GetCurrentDirectory(), "action_cat.csv");
+        return gcdActions = File.ReadLines(p).Select(l => l.Split(',')).Where(x => x.Length >= 2 && x[1] is "2" or "3").Select(x => uint.Parse(x[0])).ToHashSet();
+    }
     private sealed record PullResult(string Key, string Name, uint Id, DateTime When, bool Extra, List<Seg> Segs);
 
     public static int Main(string[] args, EncounterRegistry registry)
@@ -78,6 +88,8 @@ internal static class PeerCommands
             var players = (r.Party.Count > 0 ? r.Party : r.Players.ToList()).Where(x => x.Job == job).ToList();
             foreach (var pl in players)
             {
+                var w = new World(r, pl.Id);
+                var gcdIds = GcdActions();
                 var segs = new List<Seg>();
                 for (var i = 0; i < phases.Count; i++)
                 {
@@ -85,12 +97,22 @@ internal static class PeerCommands
                     var name = ph.Name.Split(' ')[0];
                     if (i + 1 >= phases.Count) break;                    // the pull ended in this phase: not complete
                     int s0 = ph.StartMs, s1 = phases[i + 1].StartMs;
-                    double dmg = r.Actions.Where(a => a.Source.Id == pl.Id && a.T >= s0 && a.T < s1)
-                        .Sum(a => a.Hits.Where(h => !h.Target.IsPlayer && h.Kind == HitKind.Damage).Sum(h => (double)h.Damage));
-                    dmg += r.Ticks.Where(t => !t.IsHeal && t.Source?.Id == pl.Id && !t.Target.IsPlayer && t.T >= s0 && t.T < s1).Sum(t => (double)t.Amount);
+                    double dmg = 0, free = 0;
+                    var own = r.Actions.Where(a => a.Source.Id == pl.Id && a.T >= s0 && a.T < s1).ToList();
+                    // Damage, and the same with each hit divided by the other players' raid buffs on the player and the target then
+                    // (World.RaidBuffs, the scoring multipliers): the party's composition taken out.
+                    foreach (var a in own)
+                        foreach (var h in a.Hits.Where(h => !h.Target.IsPlayer && h.Kind == HitKind.Damage))
+                        { dmg += h.Damage; free += h.Damage / w.RaidBuffs(h.Target, h.T).Mult; }
+                    foreach (var t in r.Ticks.Where(t => !t.IsHeal && t.Source?.Id == pl.Id && !t.Target.IsPlayer && t.T >= s0 && t.T < s1))
+                    { dmg += t.Amount; free += t.Amount / w.RaidBuffs(t.Target, t.T).Mult; }
                     var died = r.Deaths.Any(d => d.Victim.Id == pl.Id && d.T >= s0 && d.T < s1);
-                    var gcds = r.Actions.Count(a => a.Source.Id == pl.Id && a.T >= s0 && a.T < s1 && a.Cast is not null || a.Source.Id == pl.Id && a.T >= s0 && a.T < s1 && a.AnyDamage && a.Name != "attack");
-                    segs.Add(new Seg(name, i, dmg, (s1 - s0) / 1000.0, died, gcds));
+                    // GCDs (weaponskills and spells, one per use: the first line of an AoE's sequence), and those that hit no enemy (heals,
+                    // shields, Eukrasia, Swiftcast-free raises).
+                    var gcdUses = own.Where(a => gcdIds.Contains(a.ActionId)).GroupBy(a => (a.T / 100, a.ActionId)).Select(g => g.First()).ToList();
+                    var healUses = gcdUses.Where(a => !own.Where(b => b.ActionId == a.ActionId && Math.Abs(b.T - a.T) < 100).Any(b => b.Hits.Any(h => !h.Target.IsPlayer && h.Kind == HitKind.Damage))).ToList();
+                    segs.Add(new Seg(name, i, dmg, (s1 - s0) / 1000.0, died, gcdUses.Count, free, healUses.Count,
+                        healUses.GroupBy(a => a.Name).ToDictionary(g => g.Key, g => g.Count())));
                     if (name.Equals(until, StringComparison.OrdinalIgnoreCase)) break;
                 }
                 if (segs.Count > 0) results.Add(new PullResult(j.Key, pl.Name, pl.Id, new DateTime(j.S.StartTicks).ToLocalTime(), j.Extra, segs));
@@ -100,7 +122,7 @@ internal static class PeerCommands
         var R = results.ToList();
         var phaseNames = R.SelectMany(p => p.Segs).GroupBy(s => s.Order).OrderBy(g => g.Key).Select(g => g.First().Phase).ToList();
         Console.WriteLine($"{R.Count} player-pulls that finished at least one phase; phases through {until}: {string.Join(", ", phaseNames)}; DPS = damage in the phase / its length, phases the player lived through");
-        var header = $"{"player",-24} {"dates",-13} " + string.Join(" ", phaseNames.Select(p => $"{p + " n",6} {p + " DPS",8} {p + " died",8}")) + $" {"thru " + until + " n",11} {"thru DPS",9}";
+        var header = $"{"player",-24} {"dates",-13} " + string.Join(" ", phaseNames.Select(p => $"{p + " n",6} {p + " DPS",8} {p + " died",8}")) + $" {"thru " + until + " n",11} {"thru DPS",9} {"no-buff DPS",11} {"GCD/min",8} {"heal GCD/min",12}";
         Console.WriteLine(header);
         void Line(string label, List<PullResult> L)
         {
@@ -113,9 +135,13 @@ internal static class PeerCommands
                 parts.Add($"{segs.Count,6} {dps,8:0} {(segs.Count > 0 ? 100.0 * segs.Count(s => s.Died) / segs.Count : 0),7:0}%");
             }
             var thru = L.Where(x => x.Segs.Count == phaseNames.Count && x.Segs.All(s => !s.Died)).ToList();
-            var tDps = thru.Sum(x => x.Segs.Sum(s => s.Sec)) > 0 ? thru.Sum(x => x.Segs.Sum(s => s.Dmg)) / thru.Sum(x => x.Segs.Sum(s => s.Sec)) : 0;
+            var tSec = thru.Sum(x => x.Segs.Sum(s => s.Sec));
+            var tDps = tSec > 0 ? thru.Sum(x => x.Segs.Sum(s => s.Dmg)) / tSec : 0;
+            var tFree = tSec > 0 ? thru.Sum(x => x.Segs.Sum(s => s.BuffFree)) / tSec : 0;
+            var tGcd = tSec > 0 ? 60 * thru.Sum(x => x.Segs.Sum(s => s.Gcds)) / tSec : 0;
+            var tHeal = tSec > 0 ? 60 * thru.Sum(x => x.Segs.Sum(s => s.HealGcds)) / tSec : 0;
             var dates = L.Count == 0 ? "" : $"{L.Min(x => x.When):MM/dd}-{L.Max(x => x.When):MM/dd}";
-            Console.WriteLine($"{label,-24} {dates,-13} {string.Join(" ", parts)} {thru.Count,11} {tDps,9:0}");
+            Console.WriteLine($"{label,-24} {dates,-13} {string.Join(" ", parts)} {thru.Count,11} {tDps,9:0} {tFree,11:0} {tGcd,8:0.0} {tHeal,12:0.0}");
         }
         var groups = R.GroupBy(x => (x.Name, x.Extra)).Where(g => g.Count() >= minPulls || g.Key.Extra || g.Any(x => me.Contains(x.Id))).ToList();
         foreach (var g in groups.OrderByDescending(g => g.Any(x => me.Contains(x.Id))).ThenBy(g => g.Key.Extra)
@@ -124,6 +150,21 @@ internal static class PeerCommands
         Line("  all peers (not you, logs)", R.Where(x => !me.Contains(x.Id) && !x.Extra).ToList());
         if (R.Any(x => x.Extra)) Line("  all --extra (FFLogs)", R.Where(x => x.Extra).ToList());
         Console.WriteLine("* you   ^ --extra logs (FFLogs top parses)");
+        // GCDs that hit no enemy, per minute by name, through the last phase (the "thru" pulls), for you, the peers and --extra.
+        if (A.Contains("--heals"))
+        {
+            void Heals(string label, List<PullResult> L)
+            {
+                var thru = L.Where(x => x.Segs.Count == phaseNames.Count && x.Segs.All(s => !s.Died)).ToList();
+                var sec = thru.Sum(x => x.Segs.Sum(s => s.Sec));
+                if (sec <= 0) return;
+                var by = thru.SelectMany(x => x.Segs).SelectMany(s => s.HealNames).GroupBy(kv => kv.Key).Select(g => (g.Key, N: 60 * g.Sum(kv => kv.Value) / sec)).OrderByDescending(x => x.N);
+                Console.WriteLine($"  no-enemy GCDs/min, {label} ({thru.Count} pulls): {string.Join(", ", by.Where(x => x.N >= 0.05).Select(x => $"{x.Key} {x.N:0.0}"))}");
+            }
+            Heals("you", R.Where(x => me.Contains(x.Id)).ToList());
+            Heals("peers in your logs", R.Where(x => !me.Contains(x.Id) && !x.Extra).ToList());
+            Heals("--extra (FFLogs)", R.Where(x => x.Extra).ToList());
+        }
         // Same weeks only: peers' pulls from the dates the user played the job.
         var mine = R.Where(x => me.Contains(x.Id)).Select(x => x.When.Date).ToHashSet();
         Line("  peers, your nights only", R.Where(x => !me.Contains(x.Id) && !x.Extra && mine.Contains(x.When.Date)).ToList());

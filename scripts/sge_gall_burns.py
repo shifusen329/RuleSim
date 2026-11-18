@@ -2,7 +2,7 @@
 """Addersgall cap burns next to a real Addersgall use, in the Sage replay (2026-11-18).
 
   GALL_LOG=1 dotnet RuleSim.dll run <log> <pulls> --me=<id> > out.txt   (once per log; several files may be given)
-  sge_gall_burns.py out.txt [...] [--window 2]
+  sge_gall_burns.py out.txt [...] [--window 2] [--list 60]
 
 A "burn" is a press by one of SGE_ST_DPS.json's cap rules (rule name with "capping" or "before it caps"); every other Addersgall
 spend (Druochole, Taurochole, Ixochole, Kerachole by any other rule, the Dancing Mad plan's included) is a real use. Counts the
@@ -14,6 +14,9 @@ import sys
 
 args = sys.argv[1:]
 win = 2.0
+show = 60
+if '--list' in args:
+    i = args.index('--list'); show = int(args[i + 1]); del args[i:i + 2]
 if '--window' in args:
     i = args.index('--window'); win = float(args[i + 1]); del args[i:i + 2]
 spends = collections.defaultdict(list)    # (file, pull) -> [(t s, action, rule)]
@@ -50,6 +53,12 @@ print(f"{pulls} pulls; {sum(total.values())} cap burns, {real_n} real Addersgall
 print(f"burns with a real use within {win:g} s: {sum(near.values())} of {sum(total.values())}  ({dict(side)})")
 for name in total:
     print(f"  {name}: {near[name]} of {total[name]}")
-for p, t, act, name, dt, ract, rrule in sorted(examples)[:60]:
+by_real = collections.Counter((e[5], e[6]) for e in examples)
+print("by the real use that followed:")
+for (a, r), n in by_real.most_common():
+    print(f"  {n:4} {a} ({r})")
+gaps = collections.Counter(f"{int(abs(e[4]))}-{int(abs(e[4])) + 1} s" for e in examples)
+print("gap:", dict(sorted(gaps.items())))
+for p, t, act, name, dt, ract, rrule in sorted(examples)[:show]:
     m, s = divmod(t, 60)
     print(f"  pull {p:3} {int(m)}:{s:04.1f} {act:10} ({name}) -> real {ract} {dt:+.1f} s ({rrule})")

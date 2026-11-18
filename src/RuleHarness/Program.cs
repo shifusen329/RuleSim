@@ -468,6 +468,14 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
     E2E("DMU_Mit_SGE: the third Trap's shield before it and after it, no Eukrasia held through it",
         sgePlan.Contains("\"dtt3Shield\": \"castsSeen(GravenImage) == 3 && (sinceCast(GravenImage) >= 3 && sinceCast(GravenImage) < 4.8 || sinceCast(GravenImage) >= 7.8 && sinceCast(GravenImage) < 12)\"")
         && sgePlan.Contains("\"shieldPre\": \"dtt1Pre || dtt2Pre || ub9Pre ||"));
+    // The capping Druochole waits for the plan's first Light of Judgment Kerachole while Kerachole will be back for it (2026-11-18,
+    // user: "do it"; scripts/sge_gall_burns.py: burns with a real Addersgall use within 2 s 11 -> 2 of about 1,040 in 400 pulls).
+    {
+        var st2 = File.ReadAllText(Path.Combine(examples, "SGE_ST_DPS.json"));
+        E2E("SGE_ST_DPS: the capping Druochole waits for the plan's first Light of Judgment Kerachole",
+            st2.Contains("\"keraPlanSoon\": \"planZone && castsSeen(LightOfJudgment) == 1 && enemyCast(LightOfJudgment) && enemyCastIn(LightOfJudgment) >= 2.5 && cd(Kerachole) < enemyCastIn(LightOfJudgment) - 2.0\"")
+            && st2.Contains("\"when\": \"inCombat && gallCapping && !eqHold && !keraPlanSoon\""));
+    }
     E2E("DMU_Mit_SGE: Accretion Krasis only with time left for the heal",
         sgePlan.Contains("\"accKrasisH\": \"sinceCast(Earthquake) < 18.0 && (!buffAny(1604) || playerHp < 70)\"")
         && sgePlan.Contains("\"accKrasisO\": \"sinceCast(Earthquake) < 18.0\"")

@@ -140,6 +140,9 @@ if (DncCommands.Handles(args)) return DncCommands.Main(args, registry, Index);
 // Red Mage: "run all|<log> rdm ..." / "timeline <log> <pull> rdm --me=HEX"; see RdmCommands.cs (2026-11-18).
 if (RdmCommands.Handles(args)) return RdmCommands.Main(args, registry, Index);
 
+// Damage per phase on one job, the user against their peers: "peers all|<log> <job> ..."; see PeerCommands.cs (2026-11-18).
+if (PeerCommands.Handles(args)) return PeerCommands.Main(args, registry);
+
 // Astrologian: "run <log|all> ast ..." (the --me player's Astrologian pulls) or --job=ast (a stand-in); see AstCommands.cs.
 if (AstCommands.Handles(args)) return AstCommands.Main(args, registry, Index);
 

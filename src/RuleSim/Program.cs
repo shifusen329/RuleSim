@@ -137,6 +137,9 @@ if (DowntimeCommands.Handles(args)) return DowntimeCommands.Main(args, registry)
 // Dancer: "run all|<log> dnc ..." / "timeline <log> <pull> dnc --me=HEX"; see DncCommands.cs.
 if (DncCommands.Handles(args)) return DncCommands.Main(args, registry, Index);
 
+// Red Mage: "run all|<log> rdm ..." / "timeline <log> <pull> rdm --me=HEX"; see RdmCommands.cs (2026-11-18).
+if (RdmCommands.Handles(args)) return RdmCommands.Main(args, registry, Index);
+
 // Astrologian: "run <log|all> ast ..." (the --me player's Astrologian pulls) or --job=ast (a stand-in); see AstCommands.cs.
 if (AstCommands.Handles(args)) return AstCommands.Main(args, registry, Index);
 

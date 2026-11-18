@@ -13,7 +13,7 @@ Offline tools for tuning WrathCombo's Custom Rules against real fights.
    - movement;
    - other players' buffs and debuffs;
    - hits on the party, raidwides and deaths.
-2. **The simulated player comes from the rules.** A job model (`Sage.cs`, `SamSim.cs`, `WhmSim.cs`, `DncSim.cs`, `AstSim.cs`) stands in for one player in the log, chosen with `--me=<actor id>`. It tracks that player's own:
+2. **The simulated player comes from the rules.** A job model (`Sage.cs`, `SamSim.cs`, `WhmSim.cs`, `DncSim.cs`, `AstSim.cs`, `RdmSim.cs`) stands in for one player in the log, chosen with `--me=<actor id>`. It tracks that player's own:
    - GCD, weaving and animation lock;
    - cast times, and casts cancelled by movement;
    - MP and job gauges;
@@ -36,7 +36,8 @@ Movement is the main approximation. The log gives a position about once a second
 | `src/RuleSim.Actions` | Shared action resolution: what the server does when an actor uses an action (statuses spent and granted, job gauge, combo, targets). No dependencies; AnoMech references it to answer the player's and the bots' presses. Per-job coverage is in `docs/jobs`. |
 | `tests/RuleSim.Actions.Tests` | Its tests, including log traces of what the real server sent (`Traces/`, written by the `traces` command). `Data/actions.csv` is the player rows of the Action sheet. |
 | `legacy/SamSim` | The first Samurai simulator: fixed GCD, full uptime, no log. Superseded by `src/RuleSim/SamSim.cs`; kept for reference. |
-| `docs/results` | Tuning write-ups produced with the replay (Sage, Samurai, White Mage, Dancer). |
+| `docs/results` | Tuning write-ups produced with the replay (Sage, Samurai, White Mage, Dancer, Astrologian, Red Mage). |
+| `tools/GameDump` | Action and status rows from the local game data (Lumina), tooltips evaluated for a job and level: the job models' potencies, cast times and recasts. |
 | `docs/jobs` | How completely `RuleSim.Actions` resolves each job. |
 
 ## Requirements
@@ -62,7 +63,7 @@ RuleSim (run from `src/RuleSim/bin/Release/net10.0`):
 dotnet RuleSim.dll pulls <log> [pulls]                    # list pulls ("1-500" for all; default: your Sage pulls)
 dotnet RuleSim.dll run <log> <pulls> --me=<actor id>      # Sage: sim vs actual, per pull and in total
 dotnet RuleSim.dll timeline <log> <pull> --me=<actor id>  # merged timeline: sim, actual, boss casts, raidwides
-dotnet RuleSim.dll run <log> dnc|whm|sam|ast ...          # other jobs; see DncCommands.cs, WhmCommands.cs, SamCommands.cs, AstCommands.cs
+dotnet RuleSim.dll run <log> dnc|whm|sam|ast|rdm ...      # other jobs; see DncCommands.cs, WhmCommands.cs, SamCommands.cs, AstCommands.cs, RdmCommands.cs
 ```
 
 Common options:

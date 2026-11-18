@@ -650,6 +650,19 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
             ["opening"] = Sub(sd["opening"]), ["openerPre"] = Sub(sd["openerPre"]),
         }) == 1;
         var pre = "openerPre"; var swift = W("Swiftcast (standard opener)"); var accel = W("Acceleration (standard opener)");
+        // Acceleration before the pull (2026-11-18, user: "Add an Acceleration precast ... as an option"): off by default, never with the
+        // standard opener; with its Acceleration up nothing is pressed before 0.5 s on the countdown (an instant would pull early), then
+        // its instant Veraero III; its Grand Impact before Manafication's combo, outside any combo.
+        string Wr(string name) => Prop<string>(st[Index(st, name)], "WhenSource");
+        E2E("RDM_ST: Acceleration before the pull is an option, off by default; its instant waits for the pull, its Grand Impact goes before the combo",
+            sd["optPrepullAcceleration"] == "0" && sd["prepullAccel"] == "optPrepullAcceleration && !optStandardOpener"
+            && Wr("Acceleration before the pull (option)").StartsWith("prepullAccel && !inCombat && countdown > 1 && countdown <= 19")
+            && Wr("Wait for the pull (the countdown Acceleration's instant opens it)") == "!inCombat && countdown > 0.5 && buff(Acceleration)"
+            && Index(st, "Acceleration before the pull (option)") < Index(st, "Wait for the countdown")
+            && Index(st, "Wait for the pull (the countdown Acceleration's instant opens it)") < Index(st, "Opener Veraero III (the countdown Acceleration's instant)")
+            && Wr("Grand Impact (the countdown Acceleration's, before the combo)").StartsWith("prepullAccel && ")
+            && Wr("Grand Impact (the countdown Acceleration's, before the combo)").EndsWith("!busy")
+            && Index(st, "Grand Impact (the countdown Acceleration's, before the combo)") == Index(st, "Enchanted Riposte (start the combo)") - 1);
         E2E("RDM_ST: the standard opener is an option, off by default", sd["optStandardOpener"] == "0"
             && new[] { "Manafication (between combos)", "Embolden", "Contre Sixte", "Engagement" }.All(n => W(n).Contains("!openerPre")));
         E2E("RDM_ST: standard opener order: Swiftcast, then Fleche and Acceleration, then Embolden and Manafication",

@@ -253,6 +253,11 @@ switch (cmd)
                 foreach (var e in sim.Log.Where(e => e.What is "Eukrasian Prognosis II" or "Zoe" or "Eukrasia" or "Pneuma" or "Eukrasian Diagnosis" or "Diagnosis" or "Prognosis"))
                     Console.WriteLine($"   press {SageSim.F(e.T)} {e.What} | {e.Rule}");
             }
+            // GALL_LOG=1: every Addersgall spend (Druochole, Taurochole, Ixochole, Kerachole) with its rule (2026-11-18: cap burns
+            // within 2 s of another spend; scripts/sge_gall_burns.py reads these lines).
+            if (Environment.GetEnvironmentVariable("GALL_LOG") == "1")
+                foreach (var e in sim.Log.Where(e => e.What is "Druochole" or "Taurochole" or "Ixochole" or "Kerachole" && e.T >= 0))
+                    Console.WriteLine($"   gall {s.Ordinal} {e.T} {e.What} | {e.Rule}");
             if (Environment.GetEnvironmentVariable("SHIELD_AT") is { Length: > 0 } sa)
                 foreach (var h in w.HitsOnParty.Where(h => !h.Auto && sa.Split(',').Contains(h.Name)))
                     Console.WriteLine($"   shieldat {h.Name} {SageSim.F(h.T)} {h.Target.Name.Split(' ')[0]} {h.InstPct:0}% rules={(Metrics.SimShieldOn(sim, w, h.Target, h.T) ? 1 : 0)} dist={w.Dist(w.Me, h.Target, h.T):0}");

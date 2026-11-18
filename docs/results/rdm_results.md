@@ -40,19 +40,25 @@ their own pulls.
 ## Acceleration before the pull (optPrepullAcceleration)
 
 The guide's "pre-pull Acceleration for an additional Grand Impact". The static counts down from 16 s (697 of 894 pulls; the rest
-10-17 s), too short for the Acceleration buff to run out before a 5 s Veraero III precast (that needs 26 s), and while Grand Impact
-Ready is up nothing can be hard-cast. So the option presses Acceleration with 19 s or less left, opens with its instant Veraero III at
-the pull, then Grand Impact, then Manafication's combo (one GCD later than with the precast).
+10-17 s), too short for the Acceleration buff (20 s) to run out before the 5 s Veraero III precast (that needs 26 s), and while it is
+up Veraero III is instant (it would pull early).
 
-`run all rdm --seeds=5 --ab=optPrepullAcceleration=1`, same pulls and seeds:
+**First version (instant opener), rejected.** No precast: Acceleration with 19 s or less left, its instant Veraero III at the pull,
+Grand Impact, then Manafication's combo. `--ab=optPrepullAcceleration=1`, 5 seeds: -0.08% overall (Phase 1 -0.14%, 3:20-9:00 -0.18%,
+9 min or more +1.24% on 21 pulls); the first 30 s -0.4% (the precast and its Dualcast Verthunder III lost).
 
-| pulls | n | potency/min | Acceleration / pull | Grand Impact / pull |
-|---|---|---|---|---|
-| all | 894 | 16,242 -> 16,229 (-0.08%) | 4.89 -> 5.46 | 4.80 -> 5.41 |
-| under 3:20 (Phase 1) | 445 | -0.14% | 3.32 -> 3.99 | 3.25 -> 3.97 |
-| 3:20 - 9:00 | 428 | -0.18% | 6.21 -> 6.68 | 6.11 -> 6.59 |
-| 9:00 or more | 21 | +1.24% | 11.11 -> 11.86 | 10.90 -> 11.51 |
-| the user's | 476 | +0.28% | 4.79 -> 5.33 | 4.67 -> 5.26 |
+**Final version (click-off).** The user: Wrath's own Red Mage opener clicks the Acceleration off before the pull (RDM.cs,
+`StatusManager.ExecuteStatusOff`, the First GCD opener). The rule engine got a `statusOff` rule field for it, and the option is
+now: Acceleration with 25 s or less left, clicked off at once (its Grand Impact Ready, 30 s, stays), the usual Veraero III precast,
+the Dualcast Verthunder III, Grand Impact, then Manafication's combo (one GCD later).
 
-First 30 s: 12,317 -> 12,263 potency a pull (-0.4%): the precast Veraero III and its Dualcast Verthunder III go, Grand Impact comes in.
-414 pulls better, 464 worse. Left off by default.
+| pulls | n | potency/min | better / worse |
+|---|---|---|---|
+| all | 896 | 16,246 -> 16,367 (+0.75%) | 538 / 345 |
+| under 3:20 (Phase 1) | 444 | +1.18% | 283 / 157 |
+| 3:20 - 9:00 | 431 | +0.51% | 245 / 177 |
+| 9:00 or more | 21 | +1.15% | 10 / 11 |
+| the user's | 478 | +1.03% | 303 / 162 |
+
+First 30 s 12,320 -> 12,460 a pull (+1.1%); Acceleration 4.90 -> 5.46 and Grand Impact 4.81 -> 5.41 a pull. Off by default (the user
+asked for an option); it needs the plugin with `statusOff`.

@@ -256,6 +256,14 @@ internal sealed class RdmSim : IRuleRuntime
         return true;
     }
 
+    /// <summary> A rule's "statusOff": the status goes (Acceleration clicked off before the pull keeps its Grand Impact Ready). </summary>
+    public void StatusOff(uint statusId)
+    {
+        if (!Has(statusId)) return;
+        Drop(statusId);
+        Log.Add(new SimEvent(T, $"clicked off {RS.Name(statusId)}", "", ""));
+    }
+
     public uint Retarget(uint action, uint trigger, RuleTargetSpec[] targets)
     {
         foreach (var spec in targets)

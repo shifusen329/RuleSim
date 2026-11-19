@@ -11,7 +11,7 @@ using WrathCombo.CustomRules;
 ///     RDM rule files (RDM_ST.json with its layers, the Jolt button) and scored against what that Red Mage really did:
 ///
 ///   run       all|&lt;log&gt; rdm [--me=HEX] [--rules=DIR] [--set=a=b,...] [--ab=a=b,...] [--seeds=5] [--from=YYYYMMDD] [--file=substr]
-///             [--min-active=60] [--detail] [--fires]
+///             [--min-active=60] [--detail] [--fires] [--until=P2 (stop at the next phase's start)]
 ///   timeline  &lt;log&gt; &lt;pull&gt; rdm --me=HEX [--seed=1] [--from=s --to=s] [--trace] [--set=a=b,...]
 ///
 /// Score: potency x own Embolden (+10% magic, the game data) x other players' raid buffs (World.RaidBuffs). --ab replays every pull
@@ -106,12 +106,12 @@ internal static class RdmCommands
     };
 
     /// <summary> The logged Red Mage's own potency under the same model (combo potencies for the melee steps). </summary>
-    private static (double Pot, int Gcds, int Accel, int Gi, int Cancels) Actual(World w)
+    private static (double Pot, int Gcds, int Accel, int Gi, int Cancels) Actual(World w, int end = int.MaxValue)
     {
         var me = w.Me;
         var emb = w.R.Statuses.Where(s => s.Target.Id == me.Id && s.StatusId == RS.Embolden && s.Source?.Id == me.Id).ToList();
         double pot = 0; int gcds = 0, accel = 0, gi = 0;
-        foreach (var a in w.R.Actions.Where(a => a.Source.Id == me.Id && a.T >= -1000))
+        foreach (var a in w.R.Actions.Where(a => a.Source.Id == me.Id && a.T >= -1000 && a.T < end))
         {
             if (a.Name == "Acceleration") accel++;
             if (a.Name == "Grand Impact") gi++;
@@ -122,7 +122,7 @@ internal static class RdmCommands
             var t = Math.Max(0, a.T);
             pot += p * (emb.Any(s => s.Active(t)) ? RdmSim.EmboldenSelf : 1) * w.RaidBuffs(hit.Target, t).Mult;
         }
-        var cancels = w.R.Casts.Count(c => c.Source.Id == me.Id && c.StartMs >= 0 && c.Outcome == CastOutcome.Cancelled);
+        var cancels = w.R.Casts.Count(c => c.Source.Id == me.Id && c.StartMs >= 0 && c.StartMs < end && c.Outcome == CastOutcome.Cancelled);
         return (pot, gcds, accel, gi, cancels);
     }
 
@@ -135,15 +135,26 @@ internal static class RdmCommands
 
     public sealed record SimRun(double Pot, double Pot30, double Gcds, double Accel, double Gi, double Cancels, double Expired, Dictionary<string, double> Fires, string FirstGcds);
 
+    /// <summary> --until=P2 (2026-11-18): the start of the first phase after it (the pull's end if it never got there); else the pull's end. </summary>
+    private static int EndOf(PullReplay r)
+    {
+        var until = Opt("until", "");
+        if (until == "") return r.EndMs;
+        var phases = r.Phases.Where(p => !p.IsSegment).OrderBy(p => p.StartMs).ToList();
+        var i = phases.FindIndex(p => p.Name.Split(' ')[0].Equals(until, StringComparison.OrdinalIgnoreCase));
+        return i >= 0 && i + 1 < phases.Count ? Math.Min(r.EndMs, phases[i + 1].StartMs) : r.EndMs;
+    }
+
     private static SimRun Simulate(PullSummary s, World w, PullReplay r, string rulesDir, string set, int seed, int gcd, bool trace = false, int from = 0, int to = 0)
     {
         var sim = new RdmSim(w, gcd, seed) { Trace = trace, TraceFrom = from, TraceTo = to };
         var files = Compile(sim, rulesDir, set);
         sim.T = StartMs(s, w);
-        while (sim.T < r.EndMs)
+        var end = EndOf(r);
+        while (sim.T < end)
         {
             sim.Press(files);
-            var next = Math.Min(sim.NextWake(40), r.EndMs);
+            var next = Math.Min(sim.NextWake(40), end);
             if (next <= sim.T) break;
             sim.Advance(next - sim.T);
         }
@@ -164,7 +175,8 @@ internal static class RdmCommands
     {
         var w = new World(r, rdm.Id);
         var gcd = MeasureGcd(w);
-        var real = Actual(w);
+        var end = EndOf(r);
+        var real = Actual(w, end);
         var set = Opt("set", "");
         var ab = Opt("ab", "");
         var baseRuns = new List<SimRun>(); var altRuns = new List<SimRun>();
@@ -177,10 +189,10 @@ internal static class RdmCommands
         }
         // Active time: alive, a target up, not incapacitated (from a probe sim, which only reads the World).
         var probe = new RdmSim(w, gcd, 1) { T = 0 };
-        while (probe.T < r.EndMs) probe.Advance(Math.Min(100, r.EndMs - probe.T));
+        while (probe.T < end) probe.Advance(Math.Min(100, end - probe.T));
         avail = probe.AvailMs;
-        return new Outcome(key, rdm.Name, rdm.Id, avail / 60000.0, r.EndMs / 1000.0, s.CountdownSeconds, real.Pot, real.Gcds, real.Accel, real.Gi, real.Cancels,
-            Mean(baseRuns), altRuns.Count > 0 ? Mean(altRuns) : null, r.PhaseAt(r.EndMs - 1));
+        return new Outcome(key, rdm.Name, rdm.Id, avail / 60000.0, end / 1000.0, s.CountdownSeconds, real.Pot, real.Gcds, real.Accel, real.Gi, real.Cancels,
+            Mean(baseRuns), altRuns.Count > 0 ? Mean(altRuns) : null, r.PhaseAt(end - 1));
     }
 
     private static int Run(EncounterRegistry registry)

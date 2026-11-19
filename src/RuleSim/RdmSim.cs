@@ -130,8 +130,11 @@ internal sealed class RdmSim : IRuleRuntime
     ///     cast use it; what cancels a cast already going is the movement itself (MovingAt).
     /// </summary>
     public int LookaheadMs = 1500;
+    /// <summary> RDM_NOMOVE=1: nobody moves (an upper bound; FFLogs fights converted to ACT logs carry jumpy positions). </summary>
+    public static readonly bool NoMove = Environment.GetEnvironmentVariable("RDM_NOMOVE") == "1";
     public bool Moving()
     {
+        if (NoMove) return false;
         for (var dt = 0; dt <= LookaheadMs; dt += 100) if (MovingAt(T + dt)) return true;
         return false;
     }
@@ -139,7 +142,7 @@ internal sealed class RdmSim : IRuleRuntime
     /// <summary> The logged movement at t, except inside the logged player's own completed casts (stillWindows). </summary>
     public bool MovingAt(int t)
     {
-        if (!W.Moving(t)) return false;
+        if (NoMove || !W.Moving(t)) return false;
         int lo = 0, hi = stillWindows.Count - 1;
         while (lo <= hi)
         {
@@ -185,11 +188,13 @@ internal sealed class RdmSim : IRuleRuntime
             int lo = 0, hi = hitsCache.Count - 1, ans = -1;
             while (lo <= hi) { var mid = (lo + hi) / 2; if (hitsCache[mid].T <= T) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
             if (ans >= 0 && hitsCache[ans].T >= T - 15000 && hitsCache[ans].Target is var lt && lt.IsPresent(T) && lt.IsTargetable(T)) return lt;
-            return W.Bosses.Where(b => b.IsPresent(T) && b.IsTargetable(T) && !b.IsHidden(T)).MaxBy(b => b.MaxHp);
+            var boss = W.Bosses.Where(b => b.IsPresent(T) && b.IsTargetable(T) && !b.IsHidden(T)).MaxBy(b => b.MaxHp);
+            // Before the pull a converted FFLogs fight has no boss yet (its events start at the pull): the one there at 0.
+            return boss ?? (T < 0 ? W.Bosses.Where(b => b.IsPresent(0) && b.IsTargetable(0)).MaxBy(b => b.MaxHp) : null);
         }
     }
 
-    public double Dist(Actor? t) => t is null ? 99 : W.Dist(W.Me, t, T);
+    public double Dist(Actor? t) => t is null ? 99 : W.Dist(W.Me, t, Math.Max(0, T));
 
     public int EnemiesWithin(double r) => W.R.Actors.Count(a => a.Kind is ActorKind.Boss or ActorKind.Enemy && a.MaxHp > 0 && a.IsPresent(T) && a.IsTargetable(T) && !a.IsHidden(T) && W.Dist(W.Me, a, T) <= r);
 

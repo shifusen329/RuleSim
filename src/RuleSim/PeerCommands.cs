@@ -43,7 +43,8 @@ internal static class PeerCommands
         .Where(f => string.Compare(Path.GetFileNameWithoutExtension(f)[^8..], from, StringComparison.Ordinal) >= 0 && (only == "" || f.Contains(only)));
 
     private sealed record Seg(string Phase, int Order, double Dmg, double Sec, bool Died, int Gcds, double BuffFree, int HealGcds, Dictionary<string, int> HealNames,
-        double NoLuck = 0, int Hits = 0, int Crits = 0, int Dhs = 0, int CleanHits = 0, int CleanCrits = 0, int CleanDhs = 0, int DevHits = 0);
+        double NoLuck = 0, int Hits = 0, int Crits = 0, int Dhs = 0, int CleanHits = 0, int CleanCrits = 0, int CleanDhs = 0, int DevHits = 0,
+        int Casts = 0, int Bad = 0, int Quick = 0, double LostSec = 0, Dictionary<string, int>? BadNames = null);
 
     // Luck taken out (2026-11-18, user: "you're trying to tell me a 10% variance is attributable to RNG?"): each hit back to a normal hit
     // (a critical hit's multiplier, 1.62 at ~3,450-3,550 Critical Hit, and a direct hit's 1.25 divided out) and the raid buffs off.
@@ -115,6 +116,22 @@ internal static class PeerCommands
                 var w = new World(r, pl.Id);
                 var gcdIds = GcdActions();
                 var segs = new List<Seg>();
+                // Interrupted casts (--casts): the player's cast bars whose spell never landed. A cast counts as landed when an action
+                // of the same id by the player lands from 0.3 s after its start to 1.5 s after its cast time, before the player's next
+                // cast start (+0.2 s); a cast normally lands about 1.47 s into a 2 s cast. ACT's cancel lines (23) don't decide it:
+                // many sit on a cast that was restarted at once, and a cast restarted without one is interrupted too. Converted
+                // FFLogs logs have start lines and hits only, and are read the same way. "restarted" = the same spell started again
+                // within 1 s (the user's Red Mage: 666 such pairs, gaps spread over 0.1-0.7 s, the second always landing). Time lost:
+                // cast start to its cancel line when there is one, else to the player's next action or cast start, at most the cast time.
+                var mine = r.Actions.Where(a => a.Source.Id == pl.Id).Select(a => a.T).Concat(r.Casts.Where(c => c.Source.Id == pl.Id).Select(c => c.StartMs)).Order().ToList();
+                var starts = r.Casts.Where(c => c.Source.Id == pl.Id).OrderBy(c => c.StartMs).ToList();
+                var myHits = r.Actions.Where(a => a.Source.Id == pl.Id).ToList();
+                bool Landed(CastEvent c)
+                {
+                    var next = starts.FirstOrDefault(x => x.StartMs > c.StartMs)?.StartMs ?? int.MaxValue;
+                    var until = Math.Min(c.StartMs + c.DurationMs + 1500, next == int.MaxValue ? int.MaxValue : next + 200);
+                    return myHits.Any(a => a.ActionId == c.ActionId && a.T >= c.StartMs + 300 && a.T <= until);
+                }
                 for (var i = 0; i < phases.Count; i++)
                 {
                     var ph = phases[i];
@@ -141,12 +158,30 @@ internal static class PeerCommands
                     foreach (var t in r.Ticks.Where(t => !t.IsHeal && t.Source?.Id == pl.Id && !t.Target.IsPlayer && t.T >= s0 && t.T < s1))
                     { var m = w.RaidBuffs(t.Target, t.T).Mult; dmg += t.Amount; free += t.Amount / m; noLuck += t.Amount / Buffs(w, t.Target, t.T).DmgMult; }
                     var died = r.Deaths.Any(d => d.Victim.Id == pl.Id && d.T >= s0 && d.T < s1);
+                    var casts = starts.Where(c => c.StartMs >= s0 && c.StartMs < s1 && c.StartMs + c.DurationMs <= r.LastMs).ToList();
+                    var bad = casts.Where(c => !Landed(c)).ToList();
+                    double lost = 0; var quick = 0;
+                    foreach (var c in bad)
+                    {
+                        var stop = c.Outcome == CastOutcome.Cancelled && c.EndMs > c.StartMs ? c.EndMs : mine.FirstOrDefault(x => x > c.StartMs + 100, c.StartMs + c.DurationMs);
+                        var l = Math.Clamp(stop - c.StartMs, 0, c.DurationMs) / 1000.0;
+                        lost += l;
+                        if (starts.Any(x => x.StartMs > c.StartMs && x.StartMs <= c.StartMs + 1000 && x.ActionId == c.ActionId)) quick++;
+                        if (Environment.GetEnvironmentVariable("PEER_CAST_LOG") == "1" && me.Contains(pl.Id))
+                        {
+                            var nextA = myHits.FirstOrDefault(a => a.T > c.StartMs + 100);
+                            var nextC = starts.FirstOrDefault(x => x.StartMs > c.StartMs);
+                            Console.WriteLine($"CAST {j.Key} {name} {c.StartMs / 1000.0:0.0}s {c.Name} {c.DurationMs}ms {c.Outcome} end+{c.EndMs - c.StartMs} lost {l:0.00} " +
+                                $"next {(nextA is null ? "-" : $"{nextA.Name} +{nextA.T - c.StartMs}")} next-cast {(nextC is null ? "-" : $"{nextC.Name} +{nextC.StartMs - c.StartMs}")} moving {w.Moving(c.StartMs + Math.Min(c.DurationMs, (int)(l * 1000)) - 100)}");
+                        }
+                    }
                     // GCDs (weaponskills and spells, one per use: the first line of an AoE's sequence), and those that hit no enemy (heals,
                     // shields, Eukrasia, Swiftcast-free raises).
                     var gcdUses = own.Where(a => gcdIds.Contains(a.ActionId)).GroupBy(a => (a.T / 100, a.ActionId)).Select(g => g.First()).ToList();
                     var healUses = gcdUses.Where(a => !own.Where(b => b.ActionId == a.ActionId && Math.Abs(b.T - a.T) < 100).Any(b => b.Hits.Any(h => !h.Target.IsPlayer && h.Kind == HitKind.Damage))).ToList();
                     segs.Add(new Seg(name, i, dmg, (s1 - s0) / 1000.0, died, gcdUses.Count, free, healUses.Count,
-                        healUses.GroupBy(a => a.Name).ToDictionary(g => g.Key, g => g.Count()), noLuck, hits, crits, dhs, cHits, cCrits, cDhs, devHits));
+                        healUses.GroupBy(a => a.Name).ToDictionary(g => g.Key, g => g.Count()), noLuck, hits, crits, dhs, cHits, cCrits, cDhs, devHits,
+                        casts.Count, bad.Count, quick, lost, bad.GroupBy(c => c.Name).ToDictionary(g => g.Key, g => g.Count())));
                     if (name.Equals(until, StringComparison.OrdinalIgnoreCase)) break;
                 }
                 if (segs.Count > 0) results.Add(new PullResult(j.Key, pl.Name, pl.Id, new DateTime(j.S.StartTicks).ToLocalTime(), j.Extra, segs));
@@ -206,6 +241,29 @@ internal static class PeerCommands
             Heals("you", R.Where(x => me.Contains(x.Id)).ToList());
             Heals("peers in your logs", R.Where(x => !me.Contains(x.Id) && !x.Extra).ToList());
             Heals("--extra (FFLogs)", R.Where(x => x.Extra).ToList());
+        }
+        // Interrupted casts through the last phase (the "thru" pulls), per pull and per phase.
+        if (A.Contains("--casts"))
+        {
+            Console.WriteLine();
+            Console.WriteLine($"interrupted casts (a cast bar that never landed), pulls alive through {until}:");
+            Console.WriteLine($"  {"",-30} {"pulls",5} {"casts/pull",10} " + string.Join(" ", phaseNames.Select(p => $"{p + " int/pull",12}")) + $" {"int/pull",8} {"int/10m",7} {"% of casts",10} {"s lost/pull",11} {"restarted <1s/pull",18}  most");
+            void Casts(string label, List<PullResult> L)
+            {
+                var thru = L.Where(x => x.Segs.Count == phaseNames.Count && x.Segs.All(s => !s.Died)).ToList();
+                if (thru.Count == 0) return;
+                var segs = thru.SelectMany(x => x.Segs).ToList();
+                double n = thru.Count, sec = segs.Sum(s => s.Sec), casts = segs.Sum(s => s.Casts), bad = segs.Sum(s => s.Bad);
+                var per = phaseNames.Select(p => $"{segs.Where(s => s.Phase == p).Sum(s => s.Bad) / n,12:0.00}");
+                var names = segs.SelectMany(s => s.BadNames ?? []).GroupBy(kv => kv.Key).Select(g => (g.Key, N: g.Sum(kv => kv.Value))).OrderByDescending(x => x.N).Take(4);
+                Console.WriteLine($"  {label,-30} {thru.Count,5} {casts / n,10:0.0} {string.Join(" ", per)} {bad / n,8:0.00} {600 * bad / Math.Max(1, sec),7:0.0} {(casts > 0 ? 100 * bad / casts : 0),9:0.0}% {segs.Sum(s => s.LostSec) / n,11:0.0} {segs.Sum(s => s.Quick) / n,18:0.00}  {string.Join(", ", names.Select(x => $"{x.Key} {x.N}"))}");
+            }
+            foreach (var g in groups.Where(g => g.Key.Extra || g.Any(x => me.Contains(x.Id))))
+                Casts((g.Any(x => me.Contains(x.Id)) ? "* " : "^ ") + g.Key.Name, g.ToList());
+            Casts("all peers (not you, logs)", R.Where(x => !me.Contains(x.Id) && !x.Extra).ToList());
+            if (R.Any(x => x.Extra)) Casts("all --extra (FFLogs)", R.Where(x => x.Extra).ToList());
+            var nights = R.Where(x => me.Contains(x.Id)).Select(x => x.When.Date).ToHashSet();
+            Casts("peers, your nights only", R.Where(x => !me.Contains(x.Id) && !x.Extra && nights.Contains(x.When.Date)).ToList());
         }
         // Same weeks only: peers' pulls from the dates the user played the job.
         var mine = R.Where(x => me.Contains(x.Id)).Select(x => x.When.Date).ToHashSet();

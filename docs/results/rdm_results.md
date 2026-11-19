@@ -94,3 +94,20 @@ with food against the user's 3,457 / 2,230 without, both about 27.5% expected cr
   The 4.8 points remain with luck and buffs removed. They line up with GCDs per minute (23.1 against 24.6, -6%; against the other
   Red Mages in the user's logs, -3.8% and -4.9%).
 - No Dancer partnered a Red Mage in any of these pulls (Devilment 0%).
+
+### Interrupted casts through P2 (`peers ... --casts`, 2026-11-18)
+
+An interrupt is a cast bar whose spell never landed before the player's next cast start (a 2 s cast normally lands about 1.47 s
+in). ACT's cancel lines (23) don't decide it. 90 of the user's 408 sat on a cast that was restarted at once and landed, and many
+interrupts have no cancel line. FFLogs logs (no cancel lines) are read the same way. `PEER_CAST_LOG=1` lists the user's interrupts.
+
+| | pulls | casts/pull | P1 | P2 | per pull | % of casts | cast time lost/pull | restarted within 1 s |
+|---|---|---|---|---|---|---|---|---|
+| the user | 24 | 40.0 | 3.58 | 2.38 | **5.96** | 14.9% | 4.7 s | 1.83 |
+| FFLogs top 5 | 5 | 35.4 | 0 | 0 | **0** | 0% | 0 | 0 |
+| other Red Mages in the user's logs | 36 | 35.8 | 1.19 | 0.56 | 1.75 | 4.9% | 1.4 s | 0.56 |
+
+- **Quick restarts.** The user had 666 casts restarted within 1 s over all their pulls. The other Red Mages had 116 over a similar
+  number of pulls. The gaps spread over 0.1-0.7 s and the second cast always landed: a cast started just as the player stopped or
+  started moving.
+- **Cost.** 4.7 s of casting a pull is about 2 of the ~10 GCDs a pull the user is behind the top 5 on.

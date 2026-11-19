@@ -62,3 +62,35 @@ the Dualcast Verthunder III, Grand Impact, then Manafication's combo (one GCD la
 
 First 30 s 12,320 -> 12,460 a pull (+1.1%); Acceleration 4.90 -> 5.46 and Grand Impact 4.81 -> 5.41 a pull. Off by default (the user
 asked for an option); it needs the plugin with `statusOff`.
+
+## The gap to the top 5 through P2: luck, buffs and execution (2026-11-18)
+
+`peers all rdm --from=20260918 --extra=<the top 5 converted FFLogs logs>`: the user's 24 complete pulls through P2 against FFLogs'
+top 5 rDPS Red Mages. Gear is equal (the user's sheet x 1.05 party bonus = FFLogs' Intelligence; Jamie Jams' Crit 3,548 / DH 2,338
+with food against the user's 3,457 / 2,230 without, both about 27.5% expected crit). The new columns:
+
+- **no-luck DPS:** each hit divided by 1.62 if it crit and 1.25 if it direct-hit, and by the party's damage buffs (World.RaidBuffs
+  without the rate buffs, plus a Dancer's Standard Finish on the player).
+- **clean crit% / clean DH%:** hits under none of the rate buffs (Battle Litany, Battle Voice, Chain Stratagem, Devilment). With equal
+  gear these differ only by luck.
+
+| | pulls | DPS | no-buff | no-luck | crit% | clean crit% (hits) | clean DH% | GCD/min |
+|---|---|---|---|---|---|---|---|---|
+| the user | 24 | 36,385 | 35,464 | 27,696 | 28.5 | 27.7 (5,557) | 36.5 | 23.1 |
+| FFLogs top 5 | 5 | 40,394 | 38,586 | 29,086 | 33.7 | 31.7 (1,187) | 36.2 | 24.6 |
+| other Red Mages in the user's logs | 36 | 38,011 | 36,800 | 28,784 | 29.5 | 27.8 (8,509) | 33.9 | 24.3 |
+
+- The user's crit is what their gear gives (27.7% against about 27.5%). The top 5's clean crit is 31.7%: 3.2 standard deviations
+  (1.3 points on 1,187 hits) above it, and each of the five (30.4-34.1%) is above. Top parses are partly picked by luck. Direct hits
+  are even.
+- **Split of the -9.9%:**
+
+  | Cause | Points |
+  |---|---|
+  | The party's damage buffs | 1.8 |
+  | Crits | about 3.3: about 2 luck (the top 5's side), the rest the party's crit buffs covering more hits |
+  | **Execution** | **4.8** |
+
+  The 4.8 points remain with luck and buffs removed. They line up with GCDs per minute (23.1 against 24.6, -6%; against the other
+  Red Mages in the user's logs, -3.8% and -4.9%).
+- No Dancer partnered a Red Mage in any of these pulls (Devilment 0%).

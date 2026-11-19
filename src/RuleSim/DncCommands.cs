@@ -11,7 +11,7 @@ using WrathCombo.CustomRules;
 ///     the DNC rule files and scored against what that Dancer really did, the same way:
 ///
 ///   run       all|&lt;log&gt; dnc [--me=HEX] [--rules=DIR] [--set=a=b,...] [--seeds=5] [--from=YYYYMMDD] [--file=substr]
-///             [--min-active=60] [--detail] [--rate=0.18] [--select=FILE]
+///             [--min-active=60] [--detail] [--rate=0.18] [--select=FILE] [--until=P2 (stop at the next phase's start)]
 ///   timeline  &lt;log&gt; &lt;pull&gt; dnc --me=HEX [--seed=1] [--from=s --to=s] [--trace]
 ///
 /// Score: personal = potency x (Standard Finish, Technical Finish, Devilment's expected crit/DH, other players' raid buffs);
@@ -119,13 +119,14 @@ internal static class DncCommands
     {
         public readonly Dictionary<uint, List<(int T, long Dmg)>> PartyDmg = new();
         public readonly Dictionary<(uint Target, uint Status), List<(int S, int E)>> RealBy = new();
-        public Contrib(World w)
+        public Contrib(World w, int end = int.MaxValue)
         {
             var ids = w.Party.Where(p => p.Id != w.Me.Id).Select(p => p.Id).ToHashSet();
             foreach (var a in w.R.Actions)
             {
                 if (!ids.Contains(a.Source.Id) && !(a.Source.Kind == ActorKind.Pet && ids.Contains(a.Source.OwnerId))) continue;
                 var owner = ids.Contains(a.Source.Id) ? a.Source.Id : a.Source.OwnerId;
+                if (a.T >= end) continue;
                 var dmg = a.Hits.Where(h => !h.Target.IsPlayer && h.Kind == HitKind.Damage).Sum(h => (long)h.Damage);
                 if (dmg <= 0) continue;
                 (PartyDmg.TryGetValue(owner, out var l) ? l : PartyDmg[owner] = []).Add((a.T, dmg));
@@ -151,7 +152,7 @@ internal static class DncCommands
             RealBy.TryGetValue((actor, status), out var w) ? Windows(actor, w, status, bonus) : 0;
     }
 
-    private static (double Pot, double Dmg, int Gcds) ActualPersonal(World w)
+    private static (double Pot, double Dmg, int Gcds) ActualPersonal(World w, int end = int.MaxValue)
     {
         var me = w.Me;
         bool Own(uint st, int t) => w.R.Statuses.Any(s => s.Target.Id == me.Id && s.StatusId == st && s.Active(t));
@@ -160,7 +161,7 @@ internal static class DncCommands
         var dvI = w.R.Statuses.Where(s => s.Target.Id == me.Id && s.StatusId == DS.Devilment).ToList();
         double pot = 0, dmg = 0; var gcds = 0;
         var gcdNames = DncSim.Defs.Values.Where(d => d.Kind == AKind.Gcd).Select(d => d.Name).ToHashSet();
-        foreach (var a in w.R.Actions.Where(a => a.Source.Id == me.Id && a.T >= 0 && a.ActionId is not (33215 or 33216 or 33217 or 33218)))
+        foreach (var a in w.R.Actions.Where(a => a.Source.Id == me.Id && a.T >= 0 && a.T < end && a.ActionId is not (33215 or 33216 or 33217 or 33218)))
         {
             if (gcdNames.Contains(a.Name) && !w.Dead(me, a.T)) gcds++;
             if (!Score.Potency.TryGetValue(a.Name, out var p)) continue;
@@ -173,7 +174,7 @@ internal static class DncCommands
         return (pot, dmg, gcds);
     }
 
-    private static int RealExpired(World w)
+    private static int RealExpired(World w, int end = int.MaxValue)
     {
         var me = w.Me; var n = 0;
         var procs = new Dictionary<uint, string[]>
@@ -187,21 +188,32 @@ internal static class DncCommands
         foreach (var s in w.R.Statuses.Where(s => s.Target.Id == me.Id && procs.ContainsKey(s.StatusId)))
         {
             var e = s.EndMs;
-            if (e < 0 || e >= w.R.EndMs - 1000 || w.Dead(me, e + 1500)) continue;
+            if (e < 0 || e >= Math.Min(w.R.EndMs, end) - 1000 || w.Dead(me, e + 1500)) continue;
             if (!acts.Any(a => Math.Abs(a.T - e) <= 700 && procs[s.StatusId].Contains(a.Name))) n++;
         }
         return n;
+    }
+
+    /// <summary> --until=P2 (2026-11-18): the start of the first phase after it (the pull's end if it never got there); else the pull's end. </summary>
+    private static int EndOf(PullReplay r)
+    {
+        var until = Opt("until", "");
+        if (until == "") return r.EndMs;
+        var phases = r.Phases.Where(p => !p.IsSegment).OrderBy(p => p.StartMs).ToList();
+        var i = phases.FindIndex(p => p.Name.Split(' ')[0].Equals(until, StringComparison.OrdinalIgnoreCase));
+        return i >= 0 && i + 1 < phases.Count ? Math.Min(r.EndMs, phases[i + 1].StartMs) : r.EndMs;
     }
 
     private static Outcome? One(PullSummary s, Actor dancer, PullReplay r, string rulesDir, int seeds, string key)
     {
         var w = new World(r, dancer.Id);
         var gcd = MeasureGcd(w);
-        var contrib = new Contrib(w);
+        var end = EndOf(r);
+        var contrib = new Contrib(w, end);
         var partner = DncSim.Partner(w);
-        var (realPot, realDmg, realGcds) = ActualPersonal(w);
+        var (realPot, realDmg, realGcds) = ActualPersonal(w, end);
         var k = realPot > 0 ? realDmg / realPot : 0;
-        var realCover = Cover(w.Raidwides.Where(x => x.T >= 0 && x.T < r.EndMs && !w.Dead(w.Me, x.T)).ToList(),
+        var realCover = Cover(w.Raidwides.Where(x => x.T >= 0 && x.T < end && !w.Dead(w.Me, x.T)).ToList(),
             r.Actions.Where(a => a.Source.Id == dancer.Id && a.Name == "Shield Samba").Select(a => a.T), r.Actions.Where(a => a.Source.Id == dancer.Id && a.Name == "Improvised Finish").Select(a => a.T));
         double realContrib = w.Party.Where(p => p.Id != dancer.Id).Sum(p => contrib.RealWindows(p.Id, DS.TechnicalFinish, 0.05));
         if (partner is not null)
@@ -209,16 +221,16 @@ internal static class DncCommands
         double simPot = 0, simContrib = 0, simGcds = 0, simExp = 0, fl = 0, el = 0; var avail = 0;
         var fires = new Dictionary<string, double>();
         double simSamba = 0, simBarrier = 0;
-        var rws = w.Raidwides.Where(x => x.T >= 0 && x.T < r.EndMs && !w.Dead(w.Me, x.T)).ToList();
+        var rws = w.Raidwides.Where(x => x.T >= 0 && x.T < end && !w.Dead(w.Me, x.T)).ToList();
         for (var seed = 1; seed <= seeds; seed++)
         {
             var sim = new DncSim(w, gcd, seed * 7919 + s.Ordinal, GcdActions()) { EspritRate = double.Parse(Opt("rate", "0.18")) };
             var files = Compile(sim, rulesDir);
             sim.T = StartMs(s, w);
-            while (sim.T < r.EndMs)
+            while (sim.T < end)
             {
                 sim.Press(files);
-                var next = Math.Min(sim.NextWake(40), r.EndMs);
+                var next = Math.Min(sim.NextWake(40), end);
                 if (next <= sim.T) break;
                 sim.Advance(next - sim.T);
             }
@@ -254,7 +266,7 @@ internal static class DncCommands
         }
         var activeMin = avail / 60000.0;
         return new Outcome(key, dancer.Name, dancer.Id, activeMin, simPot / seeds, realPot, simContrib / seeds, realContrib, k, simGcds / seeds, realGcds,
-            simExp / seeds, RealExpired(w), fl / seeds, el / seeds, r.PhaseAt(r.EndMs - 1), fires,
+            simExp / seeds, RealExpired(w, end), fl / seeds, el / seeds, r.PhaseAt(end - 1), fires,
             rws.Sum(x => x.AvgPct), simSamba / seeds, realCover.Samba, simBarrier / seeds, realCover.Barrier);
     }
 

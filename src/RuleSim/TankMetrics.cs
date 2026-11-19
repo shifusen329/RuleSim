@@ -45,7 +45,8 @@ internal static class TankMetrics
 
     public static string SegmentOf(PullReplay r, int t) => r.Phases.Where(p => p.IsSegment && p.StartMs <= t && t < p.EndMs).Select(p => p.Name).FirstOrDefault() ?? "";
 
-    public static Result Run(World w, SageSim sim, double h)
+    /// <param name="who"> The players to rebuild (default the tanks; 2026-11-18: the whole party, for the lean-shield replay). </param>
+    public static Result Run(World w, SageSim sim, double h, IEnumerable<Actor>? who = null)
     {
         var r = w.R;
         var me = w.Me;
@@ -54,7 +55,8 @@ internal static class TankMetrics
         var cfDeaths = new List<CfDeath>();
         var byPhase = new Dictionary<string, (double, double, double, double, double, double, double)>();
         double rulesLow = 0, realLow = 0;
-        var tanks = w.Party.Where(World.IsTank).Where(t => t.MaxHp > 0).ToList();
+        var tanks = (who ?? w.Party.Where(World.IsTank)).Where(t => t.MaxHp > 0).ToList();
+        var whoIds = tanks.Select(t => t.Id).ToHashSet();
         var mineSt = r.Statuses.Where(s => s.Source?.Id == me.Id).ToList();
         var allDeaths = r.Deaths.OrderBy(d => d.T).ToList();
         bool Wipe(int t) => allDeaths.Count(d => d.T >= t - 1000 && d.T <= t + 3000) >= 4;
@@ -67,7 +69,7 @@ internal static class TankMetrics
         }
         // Typical logged damage of an ability on tanks (for hits a barrier fully absorbed).
         var typical = new Dictionary<string, double>();
-        foreach (var g in r.Actions.Where(a => !a.Source.IsPlayer && a.Source.Kind != ActorKind.Pet).SelectMany(a => a.Hits.Where(x => World.IsTank(x.Target) && x.Damage > 0 && x.Kind != HitKind.Heal).Select(x => (a.Name, (double)x.Damage))).GroupBy(x => x.Name))
+        foreach (var g in r.Actions.Where(a => !a.Source.IsPlayer && a.Source.Kind != ActorKind.Pet).SelectMany(a => a.Hits.Where(x => whoIds.Contains(x.Target.Id) && x.Damage > 0 && x.Kind != HitKind.Heal).Select(x => (a.Name, (double)x.Damage))).GroupBy(x => x.Name))
         {
             var l = g.Select(x => x.Item2).OrderBy(x => x).ToList();
             typical[g.Key] = l[l.Count / 2];

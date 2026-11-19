@@ -666,7 +666,7 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
         {
             ["optStandardOpener"] = "1", ["inCombat"] = "1", ["combatTime"] = "4", ["rEmb"] = "1", ["rMana"] = "1", ["hasTarget"] = "1",
             ["rSwift"] = $"{rSwift}", ["bSwift"] = $"{bSwift}", ["bAccel"] = $"{bAccel}", ["cAccel"] = $"{cAccel}", ["instant"] = $"{instant}",
-            ["opening"] = Sub(sd["opening"]), ["openerPre"] = Sub(sd["openerPre"]),
+            ["opening"] = Sub(sd["opening"]), ["openerPre"] = Sub(sd["openerPre"]), ["accKeep"] = "0",
         }) == 1;
         var pre = "openerPre"; var swift = W("Swiftcast (standard opener)"); var accel = W("Acceleration (standard opener)");
         // Acceleration before the pull (2026-11-18, user: "Add an Acceleration precast ... as an option"; then "the wrath simple st default
@@ -694,6 +694,48 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
             && At(pre, 0, 0, 1, 1, 1)                                                                 // Acceleration up
             && !At(pre, 0, 0, 0, 1, 0) && !At(accel, 0, 0, 0, 1, 0)                                   // after it: Embolden, the last charge kept
             && W("Fleche").Contains("!(opening && bSwift)"));
+    }
+    // Both Acceleration charges for Dancing Mad's two long runs (2026-11-18, user: "Ensure that both charges of Acceleration are
+    // available during extended movement"): no press while the spent charge would still be recharging at the second Graven
+    // Image's run (Graven Image #2 + 9.8 s; #1 + 60.8; before it, 87.3 s of combat) or Bowels of Agony's (+7.0; Aero III Assault
+    // + 68.2); moving before them uses Swiftcast, else holds. The plan layer mirrors it.
+    {
+        var sd = Defines("RDM_ST.json");
+        string Sub(string x) => x.Replace("castsSeen(GravenImage)", "cGI").Replace("sinceCast(GravenImage)", "sGI").Replace("castsSeen(BowelsOfAgony)", "cBoA")
+            .Replace("sinceCast(BowelsOfAgony)", "sBoA").Replace("castsSeen(AeroIIIAssault)", "cAero").Replace("sinceCast(AeroIIIAssault)", "sAero")
+            .Replace("castsSeen(LightOfJudgment)", "cLoJ").Replace("sinceCast(LightOfJudgment)", "sLoJ")
+            .Replace("chargeCd(Acceleration)", "ccAccel").Replace("charges(Acceleration)", "cAccel");
+        bool Keep(double combat, int cGI, double sGI, int cAero, double sAero, int cBoA, double sBoA, int charges, double chargeCd, int zone = 1363, int cLoJ = 3, double sLoJ = 999) => Eval(Sub(sd["accKeep"]), new()
+        {
+            ["optAccelForRuns"] = "1", ["inCombat"] = "1", ["zone"] = $"{zone}", ["combatTime"] = $"{combat}", ["cGI"] = $"{cGI}", ["sGI"] = $"{sGI}", ["cAero"] = $"{cAero}",
+            ["sAero"] = $"{sAero}", ["cBoA"] = $"{cBoA}", ["sBoA"] = $"{sBoA}", ["cAccel"] = $"{charges}", ["ccAccel"] = $"{chargeCd}", ["cLoJ"] = $"{cLoJ}", ["sLoJ"] = $"{sLoJ}",
+            ["runIn"] = Sub(sd["runIn"]),
+        }) == 1;
+        string Wr(string name) => Prop<string>(st[Index(st, name)], "WhenSource");
+        var mit = Defines("DMU_Mit_RDM.json");
+        E2E("RDM_ST: both Acceleration charges kept for Dancing Mad's second Graven Image and Bowels of Agony runs",
+            sd["optAccelForRuns"] == "1"
+            && !Keep(20, 0, 999, 0, 999, 0, 999, 2, 0, cLoJ: 0)   // 0:20, two charges: one spent now is back by the run (67 s away)
+            && Keep(33, 1, 6.5, 0, 999, 0, 999, 2, 0, cLoJ: 0)    // 0:33: 54 s to the run, a charge spent now would not be
+            && Keep(20, 0, 999, 0, 999, 0, 999, 1, 20, cLoJ: 0)   // 0:20, one charge, the other back in 20 s: spending it leaves 75 s
+            && !Keep(20, 0, 999, 0, 999, 0, 999, 1, 5, cLoJ: 0)   // ... back in 5 s: 60 s, in time
+            && Keep(85, 2, 5, 0, 999, 0, 999, 2, 0, cLoJ: 1)      // Graven Image #2 + 5: the run is 4.8 s away
+            && !Keep(88, 2, 10.5, 0, 999, 0, 999, 2, 0, cLoJ: 1)  // + 10.5: the run is on, spend them
+            && !Keep(100, 3, 1, 0, 999, 0, 999, 2, 0, cLoJ: 1)    // the third Graven Image: no run
+            && !Keep(340, 3, 200, 0, 999, 0, 999, 1, 30, cLoJ: 3, sLoJ: 3)   // the third Light of Judgment + 3: one charge, the other back in
+                                                                             // 30 s: both back 85 s after spending it, the run is 112 s away
+            && Keep(347, 3, 200, 0, 999, 0, 999, 1, 50, cLoJ: 3, sLoJ: 10)   // + 10, back in 50 s: both back in 105 s, the run 105.4 s away
+                                                                             // (with the 1 s margin, too late)
+            && !Keep(340, 3, 200, 0, 999, 0, 999, 2, 0, cLoJ: 3, sLoJ: 3)    // ... two charges: one spent is back in 55 s
+            && !Keep(390, 3, 300, 1, 5, 0, 999, 2, 0)              // Aero III Assault + 5: the Bowels run is 63 s away
+            && Keep(410, 3, 300, 1, 20, 0, 999, 2, 0)              // + 20: 48 s away
+            && Keep(450, 3, 300, 1, 65, 1, 4, 2, 0)                // Bowels of Agony + 4: 3 s away
+            && !Keep(454, 3, 300, 1, 69, 1, 7.5, 2, 0)             // + 7.5: the run is on
+            && !Keep(33, 1, 6.5, 0, 999, 0, 999, 2, 0, 1122)       // other zones: never
+            && Wr("Acceleration for movement").EndsWith("&& !accKeep") && Wr("Swiftcast for movement").Contains("(charges(Acceleration) == 0 || accKeep)")
+            && Wr("Acceleration (on cooldown, above the held charges)").EndsWith("&& !accKeep") && Wr("Acceleration (standard opener)").EndsWith("&& !accKeep")
+            && Wr("Acceleration (standard opener: the second charge in Embolden)").EndsWith("&& !accKeep")
+            && mit["runIn"] == sd["runIn"] && mit["accKeep"] == sd["accKeep"] && mit["gcdHeld"].Contains("(charges(Acceleration) == 0 || accKeep)"));
     }
     var aoe = RuleList(Rules("RDM_AoE.json"));
     E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"

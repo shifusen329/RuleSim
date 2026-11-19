@@ -133,7 +133,22 @@ internal static class RdmCommands
         return w.R.Actions.Any(a => a.Source.Id == w.Me.Id && a.T < -1000 && a.Name != "attack") ? -16000 : 0;
     }
 
-    public sealed record SimRun(double Pot, double Pot30, double Gcds, double Accel, double Gi, double Cancels, double Expired, Dictionary<string, double> Fires, string FirstGcds);
+    public sealed record SimRun(double Pot, double Pot30, double Gcds, double Accel, double Gi, double Cancels, double Expired, Dictionary<string, double> Fires, string FirstGcds,
+        List<RunProbe>? Runs = null);
+
+    /// <summary> Dancing Mad's two long runs (2026-11-18, optAccelForRuns): Acceleration charges at the run's start (the second Graven
+    /// Image + 9.8 s, Bowels of Agony + 7.0 s), and the Accelerations, GCDs and cancelled casts in the next 12 s. Alive throughout. </summary>
+    public sealed record RunProbe(string Name, int Charges, int Accel, int Gcds, int Cancels);
+
+    private static List<(string Name, int T, int Len)> RunTimes(World w)
+    {
+        var l = new List<(string, int, int)>();
+        var gi = w.CastStarts("gravenimage").ToList();
+        if (gi.Count >= 2) l.Add(("second Graven Image run", gi[1] + 9800, 12000));
+        var boa = w.CastStarts("bowelsofagony").ToList();
+        if (boa.Count >= 1) l.Add(("Bowels of Agony run", boa[0] + 7000, 12000));
+        return l;
+    }
 
     /// <summary> --until=P2 (2026-11-18): the start of the first phase after it (the pull's end if it never got there); else the pull's end. </summary>
     private static int EndOf(PullReplay r)
@@ -151,17 +166,27 @@ internal static class RdmCommands
         var files = Compile(sim, rulesDir, set);
         sim.T = StartMs(s, w);
         var end = EndOf(r);
+        var runs = RunTimes(w).Where(x => x.T + x.Len <= end && !w.Dead(w.Me, x.T) && !w.Dead(w.Me, x.T + x.Len)).ToList();
+        var atStart = new Dictionary<string, int>();
         while (sim.T < end)
         {
+            foreach (var x in runs)
+                if (sim.T >= x.T && !atStart.ContainsKey(x.Name)) atStart[x.Name] = sim.ChargesNow(RA.Acceleration);
             sim.Press(files);
             var next = Math.Min(sim.NextWake(40), end);
             if (next <= sim.T) break;
             sim.Advance(next - sim.T);
         }
+        var probes = runs.Where(x => atStart.ContainsKey(x.Name)).Select(x =>
+        {
+            var inRun = sim.Log.Where(e => e.T >= x.T && e.T < x.T + x.Len).ToList();
+            return new RunProbe(x.Name, atStart[x.Name], inRun.Count(e => e.What == "Acceleration"),
+                inRun.Count(e => RdmSim.Defs.Values.Any(d => d.Name == e.What && d.Kind == AKind.Gcd)), inRun.Count(e => e.What.StartsWith("CANCELLED")));
+        }).ToList();
         var first = string.Join(", ", sim.Log.Where(e => e.T <= 12000 && RdmSim.Defs.Values.Any(d => d.Name == e.What && d.Kind == AKind.Gcd)).Select(e => $"{SageSim.F(e.T)} {e.What}").Take(8));
         return new SimRun(sim.Damage.Sum(d => d.Potency * d.Mult), sim.Damage.Where(d => d.T < 30000).Sum(d => d.Potency * d.Mult), sim.Gcds,
             sim.Uses.GetValueOrDefault("Acceleration"), sim.Uses.GetValueOrDefault("Grand Impact"), sim.Cancelled, sim.Expired.Values.Sum(),
-            sim.RuleFires.ToDictionary(kv => kv.Key, kv => (double)kv.Value), first);
+            sim.RuleFires.ToDictionary(kv => kv.Key, kv => (double)kv.Value), first, probes);
     }
 
     public sealed record Outcome(string Key, string Name, uint Id, double ActiveMin, double EndS, int Countdown, double RealPot, int RealGcds, int RealAccel, int RealGi,
@@ -169,7 +194,8 @@ internal static class RdmCommands
 
     private static SimRun Mean(List<SimRun> l) => new(l.Average(x => x.Pot), l.Average(x => x.Pot30), l.Average(x => x.Gcds), l.Average(x => x.Accel), l.Average(x => x.Gi),
         l.Average(x => x.Cancels), l.Average(x => x.Expired),
-        l.SelectMany(x => x.Fires).GroupBy(kv => kv.Key).ToDictionary(g => g.Key, g => g.Sum(kv => kv.Value) / l.Count), l[0].FirstGcds);
+        l.SelectMany(x => x.Fires).GroupBy(kv => kv.Key).ToDictionary(g => g.Key, g => g.Sum(kv => kv.Value) / l.Count), l[0].FirstGcds,
+        l.SelectMany(x => x.Runs ?? []).ToList());
 
     private static Outcome? One(PullSummary s, Actor rdm, PullReplay r, string rulesDir, int seeds, string key)
     {
@@ -265,6 +291,19 @@ internal static class RdmCommands
             Ab("pulls 3:20 to 9:00", R.Where(o => o.EndS is >= 200 and < 540).ToList());
             Ab("pulls 9:00 or more", R.Where(o => o.EndS >= 540).ToList());
             foreach (var g in R.GroupBy(o => o.Name).Where(g => g.Count() >= 3).OrderByDescending(g => g.Count())) Ab(g.Key, g.ToList());
+            // The two long runs: Acceleration charges at the start, Accelerations, GCDs and cancels in the 12 s after (every seed).
+            foreach (var name in R.SelectMany(o => o.Base.Runs ?? []).Select(x => x.Name).Distinct())
+            {
+                string Sum(IEnumerable<RunProbe> ps)
+                {
+                    var p = ps.Where(x => x.Name == name).ToList();
+                    if (p.Count == 0) return "-";
+                    return $"charges 2/1/0: {100.0 * p.Count(x => x.Charges >= 2) / p.Count:0}%/{100.0 * p.Count(x => x.Charges == 1) / p.Count:0}%/{100.0 * p.Count(x => x.Charges == 0) / p.Count:0}%, " +
+                           $"Acceleration {p.Average(x => x.Accel):0.00}, GCDs {p.Average(x => x.Gcds):0.00}, cancels {p.Average(x => x.Cancels):0.00} ({p.Count} runs)";
+                }
+                Console.WriteLine($"  {name}: base {Sum(R.SelectMany(o => o.Base.Runs ?? []))}");
+                Console.WriteLine($"  {"",-23} alt  {Sum(R.SelectMany(o => o.Alt!.Runs ?? []))}");
+            }
             var ex = R.Where(o => o.Alt is not null).OrderByDescending(o => o.EndS).First();
             Console.WriteLine($"  first GCDs, base: {ex.Base.FirstGcds}\n  first GCDs, alt:  {ex.Alt!.FirstGcds}   ({ex.Key} {ex.Name})");
         }

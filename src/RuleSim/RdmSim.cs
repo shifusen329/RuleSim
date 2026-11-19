@@ -73,6 +73,8 @@ internal sealed class RdmSim : IRuleRuntime
     public readonly Dictionary<string, int> Expired = new();
     public readonly Dictionary<string, int> Uses = new();
     public int Gcds, Cancelled, Unmodelled, AvailMs, DeadMs, ManaLost;
+    /// <summary> An action's charges now (2026-11-18: Acceleration at the start of Dancing Mad's two long runs). </summary>
+    public int ChargesNow(uint id) => cds.TryGetValue(id, out var c) ? c.Charges(T) : 0;
     public bool Trace; public int TraceFrom, TraceTo;
 
     public static readonly Dictionary<uint, RDef> Defs = new RDef[]

@@ -142,3 +142,38 @@ corner during it, but not one that maps to your direction.
 
 - **Start.** About 3.8 s after Bowels of Agony resolves (4.7 s cast). The first Thunder III starts 8.7 s later (+17.1).
 - **Markers.** No head marker, tether or enemy status lands on you in the window.
+
+### Both Acceleration charges for the two runs (`optAccelForRuns`, RDM_ST.json, 2026-11-18)
+
+User: "Ensure that both charges of Acceleration are available during extended movement."
+
+- **The guard.** No Acceleration press while the spent charge would still be recharging when a run starts (55 s a charge, one at a
+  time, +1 s margin). Moving before the run uses Swiftcast, else holds the cast. The plan layer's `gcdHeld` and look-ahead mirror it.
+- **Run start (`runIn`).** Timed 0.5 s before the 10th-percentile start of the user's run:
+  - second Graven Image: #2 + 9.8 s, #1 + 60.8 s, before that 87.3 s of combat;
+  - Bowels of Agony: + 7.0 s, Aero III Assault + 68.2 s, Light of Judgment #3 + 115.4 s.
+- **Why the extra Phase 3 anchor.** With one charge already recharging, spending the other leaves both back only up to 110 s later.
+  Aero III Assault alone left 41% of the Bowels runs with one charge.
+
+`run all rdm --ab=optAccelForRuns=0 --seeds=3`, 909 pulls. The run probes count Acceleration charges at the run's start, then
+presses in the 12 s after:
+
+| run | | both charges | Accelerations | GCDs | cancels |
+|---|---|---|---|---|---|
+| second Graven Image (2,322 runs) | guard | 100% | 1.87 | 4.83 | 0.03 |
+| | off | 0% (99% none) | 0.01 | 3.15 | 0.15 |
+| Bowels of Agony (180 runs) | guard | 100% | 1.90 | 5.01 | 0.05 |
+| | off | 3% | 0.62 | 4.14 | 0.14 |
+
+Potency per minute, guard against off:
+
+| pulls | guard against off |
+|---|---|
+| all | **+0.32%** |
+| Phase 1 only | +0.70% |
+| 3:20-9:00 | +0.02% |
+| 9:00+ | +1.44% |
+| the user's | +0.20% |
+
+The first 30 s cost about 300 potency a pull: moving early with one charge left, the guard keeps it and uses Swiftcast or holds the
+cast. Acceleration uses fall 0.5 a pull, and fill the runs instead.

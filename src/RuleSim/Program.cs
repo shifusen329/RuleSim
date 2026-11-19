@@ -144,6 +144,8 @@ if (RdmCommands.Handles(args)) return RdmCommands.Main(args, registry, Index);
 if (PeerCommands.Handles(args)) return PeerCommands.Main(args, registry);
 // The user's runs at a fight-known move: "moves all|<log> <job> --anchor=Cast#n ..."; see MoveCommands.cs (2026-11-18).
 if (MoveCommands.Handles(args)) return MoveCommands.Main(args, registry);
+// The user's pulls on a job from the index: "list all|<log> <job> [--past=P2]"; see ListCommands.cs (2026-11-19).
+if (ListCommands.Handles(args)) return ListCommands.Main(args, registry);
 
 // Astrologian: "run <log|all> ast ..." (the --me player's Astrologian pulls) or --job=ast (a stand-in); see AstCommands.cs.
 if (AstCommands.Handles(args)) return AstCommands.Main(args, registry, Index);

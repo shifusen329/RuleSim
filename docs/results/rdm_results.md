@@ -111,3 +111,34 @@ interrupts have no cancel line. FFLogs logs (no cancel lines) are read the same 
   number of pulls. The gaps spread over 0.1-0.7 s and the second cast always landed: a cast started just as the player stopped or
   started moving.
 - **Cost.** 4.7 s of casting a pull is about 2 of the ~10 GCDs a pull the user is behind the top 5 on.
+
+## The two cross-room runs (`moves`, 2026-11-18)
+
+`moves all rdm --anchor=<cast>#n --win=a,b`: the user's longest standstill-to-standstill journey in the window. Steps are joined
+across stops under 2.5 s, so a run around the edge stays one journey. Route: "middle" if it passes within 6 y of the centre, else
+"edge" clockwise or counter-clockwise. Times are from the cast's start.
+
+**P1, the second Graven Image** (cast at about 1:17.6; `--anchor="Graven Image#2" --win=9,25`; 419 of 428 pulls 15 y or more).
+You wait at the north spot (y about -12), then run to the south (y about +10), down the middle or counter-clockwise around the west
+edge. Since 10/20 (159 runs):
+
+| route | pulls | start (p10-p90) | end | duration | moving | path |
+|---|---|---|---|---|---|---|
+| middle | 103 | +10.8 (+10.3-+11.1) | +15.1 (+14.6-+20.1) | 4.5 s | 3.1 s | 27 y |
+| edge CCW | 56 | +10.5 (+10.3-+11.0) | +19.7 (+17.7-+21.7) | 8.8 s | 5.4 s | 47 y |
+
+- **Start.** +5.5 s after the third Blizzard III Blowout's cast start (p10-p90 +4.4-+6.0). That is about 0.8 s after the Blowout
+  resolves (4.7 s cast), and 4.4 s before Revolting Ruin III #2 starts.
+- **Early runs.** Before 10/20, a few started from somewhere other than the north spot.
+
+**P3, Bowels of Agony** (Chaos, cast at about 7:25.5; `--anchor="Bowels of Agony#1" --win=0,17 --min-disp=8`). You stand a few
+yalms east of the centre and run to the wall, a different way each time (N, S, W, SE, NE, SW). Chaos moves from the centre to a
+corner during it, but not one that maps to your direction.
+
+| pulls | start (p10-p90) | end | duration | moving | displacement |
+|---|---|---|---|---|---|
+| 16 since 10/20 | +8.5 (+7.5-+9.9) | +13.9 (+13.0-+16.7) | 5.8 s | 3.4 s | 16.7 y |
+| all 23 | +9.2 (+7.5-+12.1) | +14.6 | 5.4 s | 3.3 s | 16.2 y |
+
+- **Start.** About 3.8 s after Bowels of Agony resolves (4.7 s cast). The first Thunder III starts 8.7 s later (+17.1).
+- **Markers.** No head marker, tether or enemy status lands on you in the window.

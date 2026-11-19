@@ -737,6 +737,26 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
             && Wr("Acceleration (standard opener: the second charge in Embolden)").EndsWith("&& !accKeep")
             && mit["runIn"] == sd["runIn"] && mit["accKeep"] == sd["accKeep"] && mit["gcdHeld"].Contains("(charges(Acceleration) == 0 || accKeep)"));
     }
+    // Every single-target and AoE DPS file targets the nearest enemy in combat when nothing is targeted (2026-11-18, user: "ensure
+    // all *_ST.json and *_ST_DPS.json have an auto target nearest hostile option ... include the AoE files as well"): the option
+    // (on, labelled), and as the first rule a Wait that sets the target, only in combat with nearestEnemy.
+    {
+        var dpsFiles = Directory.GetFiles(examples, "*.json").Select(Path.GetFileName).Where(n => n!.EndsWith("_ST.json") || n.EndsWith("_ST_DPS.json")
+            || n.EndsWith("_AoE.json") || n.EndsWith("_AoE_DPS.json")).Cast<string>().OrderBy(n => n).ToList();
+        var bad = new List<string>();
+        foreach (var dpsFile in dpsFiles)
+        {
+            var rs = RuleList(Rules(dpsFile));
+            var first = rs[0];
+            var raw = File.ReadAllText(Path.Combine(examples, dpsFile));
+            if (Defines(dpsFile).GetValueOrDefault("optTargetNearest") != "1" || !raw.Contains("\"optTargetNearest\": { \"label\": \"No target: target the nearest enemy\"")
+                || Prop<string>(first, "Name") != "Target the nearest enemy (option: nothing targeted)" || Prop<object>(first, "SetTarget").ToString() != "Nearest"
+                || Prop<string>(first, "WhenSource") != "optTargetNearest && inCombat && nearestEnemy" || Prop<uint>(first, "ActionId") != 1000004)
+                bad.Add(dpsFile);
+        }
+        E2E($"all {dpsFiles.Count} single-target and AoE DPS files: nearest-enemy targeting option, on, first rule{(bad.Count > 0 ? ": missing in " + string.Join(", ", bad) : "")}",
+            dpsFiles.Count >= 17 && bad.Count == 0);
+    }
     var aoe = RuleList(Rules("RDM_AoE.json"));
     E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"
         && Defines("RDM_AoE.json")["blackHigher"] == "black >= white");

@@ -467,7 +467,18 @@ E2E("settings field CustomRuleOptions", wrath.GetType("WrathCombo.Core.Configura
     // (Graven Image #3 + 3.0-4.8 s) and after it (+7.8-12), so the GCD keeps going through the Trap.
     E2E("DMU_Mit_SGE: the third Trap's shield before it and after it, no Eukrasia held through it",
         sgePlan.Contains("\"dtt3Shield\": \"castsSeen(GravenImage) == 3 && (sinceCast(GravenImage) >= 3 && sinceCast(GravenImage) < 4.8 || sinceCast(GravenImage) >= 7.8 && sinceCast(GravenImage) < 12)\"")
-        && sgePlan.Contains("\"shieldPre\": \"dtt1Pre || dtt2Pre || ub9Pre ||"));
+        && sgePlan.Contains("\"leanPre\": \"dtt1Pre || dtt2Pre\"") && sgePlan.Contains("\"shieldPre\": \"!optLeanShields && leanPre || ub9Pre ||")
+        && !System.Text.RegularExpressions.Regex.Match(sgePlan, "\"shieldPre\": \"[^\"]*\"").Value.Contains("dtt3Pre"));
+    // Lean shields (2026-11-18, user: "do it"): off by default; with it, the planned shields whose hits killed nobody more in the
+    // party HP replay go (the first Mystery Magic, the first two Traps, both Gravitas, the second Mystery Magic, the first Forsaken,
+    // with their Zoes and pre-hit shields); Wave Cannon's, every Light of Judgment's, the third Trap's, the towers' and everything
+    // from Phase 3 on stay.
+    E2E("DMU_Mit_SGE: lean shields is an option, off by default, dropping only the shields that saved nobody",
+        sgePlan.Contains("\"optLeanShields\": \"0\"") && sgePlan.Contains("\"optLeanShields\": { \"label\": ")
+        && sgePlan.Contains("\"leanShields\": \"mm1Early || mm1 || dtt1Shield || gravitas1 || gravitas2Shield || dtt2Shield || mm2Shield || forsaken1Shield\"")
+        && sgePlan.Contains("\"leanZoe\": \"zoe1 || dtt2Late || forsaken1Shield\"")
+        && sgePlan.Contains("\"shieldsWhen\": \"!optLeanShields && leanShields || waveCannonShield || loj1Shield || loj2Shield || dtt3Shield || towers1Shield")
+        && sgePlan.Contains("\"zoeWhen\": \"!optLeanShields && leanZoe || loj3Shield"));
     // The capping Druochole waits for the plan's first Light of Judgment Kerachole while Kerachole will be back for it (2026-11-18,
     // user: "do it"; scripts/sge_gall_burns.py: burns with a real Addersgall use within 2 s 11 -> 2 of about 1,040 in 400 pulls).
     {

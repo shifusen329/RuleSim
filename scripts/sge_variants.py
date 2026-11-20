@@ -46,7 +46,7 @@ rows = []
 for name, d in variants:
     t, fires, lose = read(d)
     ediag = sum(n for k, n in fires.items() if k.endswith(('Eukrasian Diagnosis on a tank', 'Eukrasian Diagnosis (spare Eukrasia)', 'Eukrasian Diagnosis on a tank in danger',
-                                                           'Eukrasian Diagnosis on a tank (no target)', 'Eukrasian Diagnosis on the boss\'s target (under 2 Addersting)')) or 'Eukrasian Diagnosis' in k)
+                                                           'Eukrasian Diagnosis on a tank (no target)', 'Eukrasian Diagnosis on the boss\'s target (Addersting below the tank shield count)')) or 'Eukrasian Diagnosis' in k)
     eprog = sum(n for k, n in fires.items() if 'Eukrasian Prognosis' in k)
     dosis = sum(n for k, n in fires.items() if k.endswith(': Eukrasian Dosis'))
     rows.append((name, t, ediag, eprog, dosis, lose))

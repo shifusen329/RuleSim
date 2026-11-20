@@ -757,6 +757,21 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
         E2E($"all {dpsFiles.Count} single-target and AoE DPS files: nearest-enemy targeting option, on, first rule{(bad.Count > 0 ? ": missing in " + string.Join(", ", bad) : "")}",
             dpsFiles.Count >= 17 && bad.Count == 0);
     }
+    // Sage's tank shield for Addersting has its own count (2026-11-19, user: "Are the number of charges of addersting configurable
+    // before shielding tanks ... add it"): optTankShieldSting (default 2, the old behaviour), separate from Toxikon's reserve, and
+    // the plan's spare-Eukrasia check follows its mirror.
+    {
+        var sd = Defines("SGE_ST_DPS.json"); var md = Defines("DMU_Mit_SGE.json");
+        var sgeRules = RuleList(Rules("SGE_ST_DPS.json")); var mitRules = RuleList(Rules("DMU_Mit_SGE.json"));
+        var sgeText = File.ReadAllText(Path.Combine(examples, "SGE_ST_DPS.json")); var mitText = File.ReadAllText(Path.Combine(examples, "DMU_Mit_SGE.json"));
+        E2E("SGE: the tank shield below optTankShieldSting Addersting (default 2), not Toxikon's reserve; the plan's mirror the same",
+            sd.GetValueOrDefault("optTankShieldSting") == "2" && md.GetValueOrDefault("optTankShieldSting") == "2"
+            && sd["tankShieldWanted"].Contains("sting < optTankShieldSting") && !sd["tankShieldWanted"].Contains("optStingReserve")
+            && Prop<string>(mitRules[Index(mitRules, "Eukrasian Prognosis (planned shields)")], "WhenSource").Contains("sting >= optTankShieldSting")
+            && !Prop<string>(mitRules[Index(mitRules, "Eukrasian Prognosis (planned shields)")], "WhenSource").Contains("sting >= 2")
+            && sgeText.Contains("\"optTankShieldSting\": { \"label\": \"Tank shield below Addersting\"") && mitText.Contains("\"optTankShieldSting\": { \"label\": \"Tank shield below Addersting")
+            && Index(sgeRules, "Eukrasia for the tank shield (Addersting below the tank shield count)") >= 0);
+    }
     var aoe = RuleList(Rules("RDM_AoE.json"));
     E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"
         && Defines("RDM_AoE.json")["blackHigher"] == "black >= white");
@@ -1108,8 +1123,9 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
                 unmarked.Add($"{Path.GetFileName(f)}: {Prop<string>(o, "Name")}");
         }
     }
-    // 45 since 2026-11-17: the three healer plans' optAccFirstLine (1 or 2) went with the Accretions' line order.
-    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 45,
+    // 45 since 2026-11-17: the three healer plans' optAccFirstLine (1 or 2) went with the Accretions' line order. 47 since
+    // 2026-11-19: Sage's optTankShieldSting (0-3) in SGE_ST_DPS.json and its mirror in DMU_Mit_SGE.json.
+    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 47,
         $"{marked} marked; {string.Join(", ", unmarked)}");
 
     // The trash burst hold in every job's DPS files (the user, 2026-11-03: "Apply the hold 2min burst for trash to all
@@ -1315,7 +1331,7 @@ E2E("mouseover target kind", RuleTargets.TryParseKind("mouseover", out var mouse
     {
         var dps = RuleList(Rules("SGE_ST_DPS.json"));
         var heal = RuleList(Rules("SGE_ST_Heal.json"));
-        var eDiag = new[] { R(dps, "Pre-pull Eukrasian Diagnosis on a tank"), R(dps, "Eukrasian Diagnosis on the boss's target (under 2 Addersting)"),
+        var eDiag = new[] { R(dps, "Pre-pull Eukrasian Diagnosis on a tank"), R(dps, "Eukrasian Diagnosis on the boss's target (Addersting below the tank shield count)"),
             R(dps, "Eukrasian Diagnosis (spare Eukrasia)"), R(heal, "Eukrasian Diagnosis (Eukrasia is up)") };
         E2E("SGE: Eukrasian Diagnosis tries the mouseover first", eDiag.All(r => Target(r)!.StartsWith("mouseover, ")),
             string.Join(" | ", eDiag.Select(Target)));

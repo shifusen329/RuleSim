@@ -22,6 +22,8 @@ PVE = os.path.join(ROOT, "Combos", "PvE")
 
 
 def strip_comments(src):
+    # Preprocessor lines (#region / #endregion inside a class, 2026-11-23: GNB.cs) would otherwise prefix the next name.
+    src = re.sub(r"^[ \t]*#[^\n]*", " ", src, flags=re.M)
     src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
     src = re.sub(r"//[^\n]*", " ", src)
     # string literals (so braces inside them don't count)

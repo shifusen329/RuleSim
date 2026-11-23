@@ -772,6 +772,36 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
             && sgeText.Contains("\"optTankShieldSting\": { \"label\": \"Tank shield below Addersting\"") && mitText.Contains("\"optTankShieldSting\": { \"label\": \"Tank shield below Addersting")
             && Index(sgeRules, "Eukrasia for the tank shield (Addersting below the tank shield count)") >= 0);
     }
+    // Gunbreaker spends the cartridges the next No Mercy won't need (2026-11-23, user: "Use burst strike > Continuation to
+    // increase DPS if not holding for a No Mercy Window"): after the spend, the Solid Barrels before the Gnashing Fang setup
+    // (nmCd - 7.5) must still make 3; Dancing Mad's downtime (198-209 s; the first Forsaken +153.8 to +200 s) builds none.
+    {
+        var gd = Defines("GNB_ST.json");
+        var gst = RuleList(Rules("GNB_ST.json"));
+        string Sub(string x) => x.Replace("castsSeen(UltimateEmbrace)", "cUE").Replace("castsSeen(MysteryMagic)", "cMM").Replace("sinceCast(MysteryMagic)", "sMM")
+            .Replace("castsSeen(Forsaken)", "cFs").Replace("firstCast(Forsaken)", "fFs").Replace("combo(BrutalShell)", "cBS").Replace("combo(KeenEdge)", "cKE");
+        bool Spare(int carts, double nmCd, int barrel, double combat = 60, int zone = 1122, int cMM = 0, double sMM = 999, int cUE = 0, int cFs = 0, double fFs = 0) => Eval(Sub(gd["spareCart"]), new()
+        {
+            ["optSpendSpare"] = "1", ["inCombat"] = "1", ["nmUp"] = "0", ["carts"] = $"{carts}", ["nmCd"] = $"{nmCd}", ["gcd"] = "2.5", ["zone"] = $"{zone}",
+            ["combatTime"] = $"{combat}", ["cMM"] = $"{cMM}", ["sMM"] = $"{sMM}", ["cUE"] = $"{cUE}", ["cFs"] = $"{cFs}", ["fFs"] = $"{fFs}",
+            ["cBS"] = barrel == 1 ? "1" : "0", ["cKE"] = barrel == 2 ? "1" : "0",
+            ["barrelIn"] = Sub(gd["barrelIn"]), ["rebuildTime"] = Sub(gd["rebuildTime"]), ["tSetup"] = Sub(gd["tSetup"]), ["gap1S"] = Sub(gd["gap1S"]),
+            ["gap2S"] = Sub(gd["gap2S"]), ["downBeforeSetup"] = Sub(gd["downBeforeSetup"]),
+        }) == 1;
+        E2E("GNB_ST: Burst Strike on a spare cartridge only when the next No Mercy still gets 3 (Dancing Mad downtime not counted)",
+            gd["optSpendSpare"] == "1"
+            && Spare(3, 40, 3)                       // 32.5 s to the setup, 12.5 s to rebuild one: spend
+            && !Spare(3, 18, 3)                      // 10.5 s to the setup: keep
+            && !Spare(1, 30, 3)                      // two to rebuild after spending, 27.5 s > 22.5 s: keep
+            && Spare(1, 40, 3)                       // 32.5 s >= 27.5 s: spend
+            && !Spare(3, 12, 3)                      // the setup's own rules from 13 s
+            && Spare(3, 80, 3, 160, 1363, 2)         // end of Phase 1, No Mercy held 80 s: the 11 s gap still leaves 61.5 s
+            && !Spare(3, 25, 3, 190, 1363, 3, 8.2)   // 17.5 s to the setup with Kefka gone 8-19 s of it: 9.5 s < 12.5 s, keep
+            && Spare(3, 25, 3, 190, 1122, 3, 8.2)    // the same outside Dancing Mad: spend
+            && !Spare(2, 50, 3, 380, 1363, 3, 200, 1, 1, 150)   // Phase 2 end: 42.5 s to the setup, 42.5 s of it the 6:22-7:08 gap: keep
+            && Index(gst, "Burst Strike (spare cartridge)") == Index(gst, "Burst Strike (Bloodfest ending)") + 1
+            && Prop<string>(gst[Index(gst, "Burst Strike (spare cartridge)")], "WhenSource") == "spareCart && step == 0 && hasTarget && inMelee");
+    }
     var aoe = RuleList(Rules("RDM_AoE.json"));
     E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"
         && Defines("RDM_AoE.json")["blackHigher"] == "black >= white");

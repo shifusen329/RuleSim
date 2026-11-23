@@ -779,15 +779,28 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
         var gd = Defines("GNB_ST.json");
         var gst = RuleList(Rules("GNB_ST.json"));
         string Sub(string x) => x.Replace("castsSeen(UltimateEmbrace)", "cUE").Replace("castsSeen(MysteryMagic)", "cMM").Replace("sinceCast(MysteryMagic)", "sMM")
-            .Replace("castsSeen(Forsaken)", "cFs").Replace("firstCast(Forsaken)", "fFs").Replace("combo(BrutalShell)", "cBS").Replace("combo(KeenEdge)", "cKE");
-        bool Spare(int carts, double nmCd, int barrel, double combat = 60, int zone = 1122, int cMM = 0, double sMM = 999, int cUE = 0, int cFs = 0, double fFs = 0) => Eval(Sub(gd["spareCart"]), new()
+            .Replace("castsSeen(Forsaken)", "cFs").Replace("firstCast(Forsaken)", "fFs").Replace("combo(BrutalShell)", "cBS").Replace("combo(KeenEdge)", "cKE")
+            .Replace("chargeCd(GnashingFang)", "gfCd").Replace("charges(GnashingFang)", "gfCh");
+        Dictionary<string, string> Env(int carts, double nmCd, int barrel, double combat = 60, int zone = 1122, int cMM = 0, double sMM = 999, int cUE = 0, int cFs = 0, double fFs = 0,
+            int gfCh = 0, double gfCd = 0) => new()
         {
+            ["gfCh"] = $"{gfCh}", ["gfCd"] = $"{gfCd}", ["step"] = "0", ["spareCart"] = Sub(gd["spareCart"]), ["gfSpare"] = Sub(gd["gfSpare"]),
             ["optSpendSpare"] = "1", ["inCombat"] = "1", ["nmUp"] = "0", ["carts"] = $"{carts}", ["nmCd"] = $"{nmCd}", ["gcd"] = "2.5", ["zone"] = $"{zone}",
             ["combatTime"] = $"{combat}", ["cMM"] = $"{cMM}", ["sMM"] = $"{sMM}", ["cUE"] = $"{cUE}", ["cFs"] = $"{cFs}", ["fFs"] = $"{fFs}",
             ["cBS"] = barrel == 1 ? "1" : "0", ["cKE"] = barrel == 2 ? "1" : "0",
             ["barrelIn"] = Sub(gd["barrelIn"]), ["rebuildTime"] = Sub(gd["rebuildTime"]), ["tSetup"] = Sub(gd["tSetup"]), ["gap1S"] = Sub(gd["gap1S"]),
             ["gap2S"] = Sub(gd["gap2S"]), ["downBeforeSetup"] = Sub(gd["downBeforeSetup"]),
-        }) == 1;
+        };
+        bool Spare(int carts, double nmCd, int barrel, double combat = 60, int zone = 1122, int cMM = 0, double sMM = 999, int cUE = 0, int cFs = 0, double fFs = 0) =>
+            Eval(Sub(gd["spareCart"]), Env(carts, nmCd, barrel, combat, zone, cMM, sMM, cUE, cFs, fFs)) == 1;
+        // Which spare spender goes: "GF" (the Gnashing Fang rule), "BS" (Burst Strike) or "" (none).
+        var gfWhen = Sub(Prop<string>(gst[Index(gst, "Gnashing Fang (spare charge and cartridge)")], "WhenSource")).Replace(" && hasTarget && inMelee", "");
+        var bsWhen = Sub(Prop<string>(gst[Index(gst, "Burst Strike (spare cartridge)")], "WhenSource")).Replace(" && hasTarget && inMelee", "");
+        string Pick(int carts, double nmCd, int gfCh, double gfCd)
+        {
+            var env = Env(carts, nmCd, 3, gfCh: gfCh, gfCd: gfCd); env["gfHeld"] = Sub(gd["gfHeld"]);
+            return Eval(gfWhen, env) == 1 ? "GF" : Eval(bsWhen, env) == 1 ? "BS" : "";
+        }
         E2E("GNB_ST: Burst Strike on a spare cartridge only when the next No Mercy still gets 3 (Dancing Mad downtime not counted)",
             gd["optSpendSpare"] == "1"
             && Spare(3, 40, 3)                       // 32.5 s to the setup, 12.5 s to rebuild one: spend
@@ -799,8 +812,20 @@ E2E("RDM examples embedded", new[] { "RDM_ST", "RDM_AoE" }.All(n => wrath.GetMan
             && !Spare(3, 25, 3, 190, 1363, 3, 8.2)   // 17.5 s to the setup with Kefka gone 8-19 s of it: 9.5 s < 12.5 s, keep
             && Spare(3, 25, 3, 190, 1122, 3, 8.2)    // the same outside Dancing Mad: spend
             && !Spare(2, 50, 3, 380, 1363, 3, 200, 1, 1, 150)   // Phase 2 end: 42.5 s to the setup, 42.5 s of it the 6:22-7:08 gap: keep
-            && Index(gst, "Burst Strike (spare cartridge)") == Index(gst, "Burst Strike (Bloodfest ending)") + 1
-            && Prop<string>(gst[Index(gst, "Burst Strike (spare cartridge)")], "WhenSource") == "spareCart && step == 0 && hasTarget && inMelee");
+            && Index(gst, "Gnashing Fang (spare charge and cartridge)") == Index(gst, "Burst Strike (Bloodfest ending)") + 1
+            && Index(gst, "Burst Strike (spare cartridge)") == Index(gst, "Gnashing Fang (spare charge and cartridge)") + 1
+            && Prop<string>(gst[Index(gst, "Burst Strike (spare cartridge)")], "WhenSource") == "spareCart && step == 0 && gfHeld && hasTarget && inMelee");
+        // The spare cartridge goes on Gnashing Fang when a charge is spare too, on Burst Strike when Gnashing Fang is on cooldown
+        // or held for No Mercy (user, 2026-11-23).
+        E2E("GNB_ST: a spare cartridge goes on Gnashing Fang when its charge is spare, else (on cooldown or held for No Mercy) Burst Strike",
+            Pick(3, 40, 0, 12) == "BS"              // Gnashing Fang on cooldown
+            && Pick(3, 40, 2, 0) == "GF"            // both charges, No Mercy 40 s away: one is spare
+            && Pick(3, 20, 2, 0) == "BS"            // both charges, No Mercy 20 s away: both kept for the setup and the window
+            && Pick(3, 40, 1, 10) == "GF"           // one charge, the next back at 10 s (setup) and 40 s (in the window)
+            && Pick(3, 40, 1, 25) == "BS"           // the one after back at 55 s, after the window's +12 s: held
+            && Pick(3, 18, 1, 5) == ""              // the cartridge isn't spare: neither
+            && Pick(1, 37, 2, 0) == "BS"            // 29.5 s to the setup: spare for Burst Strike (27.5 s), not for the combo's two GCDs more (32.5 s)
+            && Pick(1, 32, 2, 0) == "");            // 24.5 s: not even for Burst Strike
     }
     var aoe = RuleList(Rules("RDM_AoE.json"));
     E2E("RDM_AoE: Verflare only when white is higher", Prop<string>(aoe[Index(aoe, "Verflare")], "WhenSource") == "stacks == 3 && !blackHigher"

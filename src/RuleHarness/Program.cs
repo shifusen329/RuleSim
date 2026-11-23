@@ -1312,10 +1312,11 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
         && File.ReadAllText(Path.Combine(examples, "DMU_Mit_PLD.json")).Contains("\"hgWhen\": \"optHallowedGround && ("));
     // Bulwark (22) on the tankbusters (the user's request, 2026-10-22): the DMU plan's busters and the marker elsewhere.
     E2E("DMU_Mit_PLD presses Bulwark on the busters", Prop<uint>(R(planRules, "Bulwark (buster)"), "ActionId") == 22);
-    // Interject and Low Blow on enemy casts (2026-11-05, user: "add it to all tank single target custom rules"): every tank
-    // single-target file, outside Dancing Mad, behind its option (on), aimed by the interrupt / stun target kinds; Low Blow
-    // only when Interject isn't taking the cast.
-    foreach (var f in new[] { "GNB_ST.json", "PLD_ST.json", "WAR_ST.json" })
+    // Interject and Low Blow on enemy casts (2026-11-05, user: "add it to all tank single target custom rules"; the AoE files
+    // 2026-11-23, user: "apply the retarget lowblow/interject ... to all tank AoE and ST custom rules"): every tank single-target
+    // and AoE file, outside Dancing Mad, behind its option (on), aimed by the interrupt / stun target kinds; Low Blow only when
+    // Interject isn't taking the cast; ahead of the oGCDs (the tankbuster rules too).
+    foreach (var f in new[] { "GNB_ST.json", "PLD_ST.json", "WAR_ST.json", "GNB_AoE.json", "PLD_AoE.json", "WAR_AoE.json" })
     {
         var rs = RuleList(Rules(f));
         var ij = R(rs, "Interject (an enemy's cast)"); var lb = R(rs, "Low Blow (a trash enemy's cast)");

@@ -185,3 +185,37 @@ into it, the real Sage's shields and cooldowns around it); the trace line now sh
 party average and lowest HP; TRACE_ALL=1 prints every press every 100 ms; PANH_DEBUG=1 prints the Panhaima model's
 inputs per slot. Tools: ev.sh (the three runs + one-line summaries), cmp_rw.py (per-hit coverage differences between
 two runs), cmp_cov.py (per-raidwide coverage drops), probe/ (log probes), lum/ (game-data check of Eukrasia).
+
+## Balanced planned shields (2026-11-24)
+
+User: "Find me a balanced SGE that doesn't leave everyone exposed <25% hp while optimizing DPS."
+
+`scripts/sge_balance.sh` replays the user's Sage pulls with `run <log> sge --party`: 489 player-pulls, 1,718 active minutes, both
+character ids. Every variant starts from the user's live options (Ixochole 65, Pneuma 50, tank shield whenever under two
+Addersting). `TankMetrics` now also gives time and dips under 25%, for the non-tanks and the tanks.
+
+| variant | potency/min | vs full | players lost | tanks lost | party s<25% | party s<15% | tank s<25% |
+|---|---|---|---|---|---|---|---|
+| full plan (lean off) | 9,137 | | 498 | 114 | 13,111 | 5,819 | 2,394 |
+| lean (all seven dropped; the user's live setting) | 9,471 | +3.65% | 485 | 122 | 15,181 | 7,132 | 2,423 |
+| drop Mystery Magic #1 only | 9,180 | +0.47% | 504 | 113 | 13,275 | 6,016 | 2,406 |
+| drop Trap #1 only | 9,202 | +0.71% | 516 | 115 | 12,935 | 5,715 | 2,378 |
+| drop Gravitas #1 only | 9,165 | +0.31% | 436 | 109 | 13,266 | 6,056 | 2,446 |
+| drop Gravitas #2 only | 9,163 | +0.28% | 432 | 104 | 11,649 | 4,230 | 2,376 |
+| drop Trap #2 only | 9,217 | +0.88% | 496 | 111 | 13,033 | 5,780 | 2,399 |
+| drop Mystery Magic #2 only | 9,182 | +0.49% | 526 | 114 | 15,037 | 6,772 | 2,384 |
+| drop Forsaken #1 only | 9,192 | +0.61% | 493 | 115 | 12,979 | 5,787 | 2,394 |
+| lean + Ixochole/Pneuma 85 | 9,457 | +3.50% | 434 | 124 | 14,747 | 6,623 | 2,469 |
+| keep MM2 | 9,417 | +3.07% | 456 | 123 | 13,133 | 6,104 | 2,428 |
+| keep MM1 + MM2 | 9,399 | +2.86% | 443 | 117 | 13,165 | 6,050 | 2,461 |
+| keep MM2 + heals 85 | 9,404 | +2.93% | 404 | 123 | 12,922 | 5,604 | 2,467 |
+| **keep MM1 + MM2 + heals 85 (= Balanced, optLeanShields 2)** | **9,389** | **+2.76%** | **365** | **113** | **12,639** | **5,149** | 2,500 |
+
+- **Logged (the user's own play):** party under 25% 8,808 s, tanks 2,031 s. The replay's exposure is higher than logged in every
+  variant: its healing differs from the user's real presses. The variants compare against one another.
+- **Mystery Magic #2's shield** carries the risk: dropping it alone adds 15% party time under 25%, for +0.5% potency.
+- **Gravitas #2's shield** is safer dropped.
+- **Ixochole and Pneuma back at 85%** are nearly free and cut the losses.
+- **"Tank shield only while moving"** changed nothing in Dancing Mad (lean + heals with it on and off: identical).
+- **Balanced** is a third choice of DMU_Mit_SGE's optLeanShields (0 full, 1 lean, 2 balanced, the default). Its replay with
+  Ixochole and Pneuma at 85 gives the same figures as the variant above.

@@ -22,7 +22,10 @@ internal static class TankMetrics
     public sealed record Death(int T, string Tank, string Phase, string Segment, string Cause, double MarginPct, bool Survives);
     public sealed record CfDeath(int T, string Tank, string Phase, string Hit);
     public sealed record Result(List<Death> Deaths, List<CfDeath> CfDeaths, Dictionary<string, (double LogLow30, double CfLow30, double LogLow15, double CfLow15, double CfMin, double LogMin, double CfDead)> ByPhase,
-        double RulesHealOnLowTank, double RealHealOnLowTank, List<string> Notes);
+        double RulesHealOnLowTank, double RealHealOnLowTank, List<string> Notes,
+        double LogLow25 = 0, double CfLow25 = 0, int LogDips25 = 0, int CfDips25 = 0);
+    // 25% (2026-11-24, user: "a balanced SGE that doesn't leave everyone exposed <25% hp while optimizing DPS"): seconds under 25%,
+    // and dips (a player going from 25% or more to under it), logged and counterfactual, over the whole pull.
 
     private sealed class Barrier
     {
@@ -54,7 +57,7 @@ internal static class TankMetrics
         var deaths = new List<Death>();
         var cfDeaths = new List<CfDeath>();
         var byPhase = new Dictionary<string, (double, double, double, double, double, double, double)>();
-        double rulesLow = 0, realLow = 0;
+        double rulesLow = 0, realLow = 0, log25 = 0, cf25 = 0; int logDips25 = 0, cfDips25 = 0;
         var tanks = (who ?? w.Party.Where(World.IsTank)).Where(t => t.MaxHp > 0).ToList();
         var whoIds = tanks.Select(t => t.Id).ToHashSet();
         var mineSt = r.Statuses.Where(s => s.Source?.Id == me.Id).ToList();
@@ -169,6 +172,7 @@ internal static class TankMetrics
             int ei = 0;
             var stopAt = int.MaxValue;   // a counterfactual death: stop tracking
             var phaseAcc = new Dictionary<string, double[]>();
+            bool lowLog = false, lowCf = false;
             double[] Acc(string ph) => phaseAcc.TryGetValue(ph, out var a) ? a : phaseAcc[ph] = [0, 0, 0, 0, 100, 100, 0];
             int lastExpiryCheck = 0;
             void Cap(int t, double logged) => delta = Math.Min(delta, max - logged);
@@ -276,6 +280,9 @@ internal static class TankMetrics
                 var cf = t >= stopAt ? 0 : Math.Min(max, lg + delta);
                 var cfDeadNow = t >= stopAt;
                 var lp = 100 * lg / max; var cp = 100 * cf / max;
+                if (lp < 25) { log25 += 0.1; if (!lowLog) logDips25++; }
+                if (cp < 25 && !cfDeadNow) { cf25 += 0.1; if (!lowCf) cfDips25++; }
+                lowLog = lp < 25; lowCf = cp < 25 && !cfDeadNow;
                 var ph0 = PhaseOf(r, t);
                 foreach (var key in new[] { ph0, ph0 == "p3" ? "p3 " + SegmentOf(r, t) : "" })
                 {
@@ -292,6 +299,6 @@ internal static class TankMetrics
                 byPhase[ph] = (old.Item1 + a[0], old.Item2 + a[1], old.Item3 + a[2], old.Item4 + a[3], Math.Min(old.Item5, a[4]), Math.Min(old.Item6, a[5]), old.Item7 + a[6]);
             }
         }
-        return new Result(deaths, cfDeaths, byPhase, rulesLow, realLow, notes);
+        return new Result(deaths, cfDeaths, byPhase, rulesLow, realLow, notes, log25, cf25, logDips25, cfDips25);
     }
 }

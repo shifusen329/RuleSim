@@ -355,12 +355,13 @@ switch (cmd)
         }
         // 2026-10-28 tank care (TankMetrics.cs): the tanks' HP had the rules played the Sage.
         var tDeaths = new List<(int Pull, TankMetrics.Death D)>(); var tCf = new List<(int Pull, TankMetrics.CfDeath D)>();
-        var tPh = new Dictionary<string, double[]>(); double tRulesLow = 0, tRealLow = 0;
+        var tPh = new Dictionary<string, double[]>(); double tRulesLow = 0, tRealLow = 0, tLog25 = 0, tCf25 = 0; int tLogDips = 0, tCfDips = 0;
         foreach (var (s, sim, w, a) in done)
         {
             var tr = TankMetrics.Run(w, sim, hpPerPot);
             tDeaths.AddRange(tr.Deaths.Select(d => (s.Ordinal, d))); tCf.AddRange(tr.CfDeaths.Select(d => (s.Ordinal, d)));
             tRulesLow += tr.RulesHealOnLowTank; tRealLow += tr.RealHealOnLowTank;
+            tLog25 += tr.LogLow25; tCf25 += tr.CfLow25; tLogDips += tr.LogDips25; tCfDips += tr.CfDips25;
             foreach (var (k, v) in tr.ByPhase)
             {
                 var x = tPh.TryGetValue(k, out var o) ? o : tPh[k] = [0, 0, 0, 0, 100, 100, 0, 0];
@@ -376,17 +377,19 @@ switch (cmd)
         }
         // --party (2026-11-18): the same counterfactual for the non-tanks (the rules' barriers, mitigation and heals in place of the
         // real Sage's): players the rules would lose who lived, by hit, and their time under 30% / 15%.
-        var pCf = new List<(int Pull, TankMetrics.CfDeath D)>(); double pLog30 = 0, pCf30 = 0, pLog15 = 0, pCf15 = 0;
+        var pCf = new List<(int Pull, TankMetrics.CfDeath D)>(); double pLog30 = 0, pCf30 = 0, pLog15 = 0, pCf15 = 0, pLog25 = 0, pCf25 = 0; int pLogDips = 0, pCfDips = 0;
         if (args.Contains("--party"))
             foreach (var (s, sim, w, a) in done)
             {
                 var pr = TankMetrics.Run(w, sim, hpPerPot, w.Party.Where(p => !World.IsTank(p)));
                 pCf.AddRange(pr.CfDeaths.Select(d => (s.Ordinal, d)));
+                pLog25 += pr.LogLow25; pCf25 += pr.CfLow25; pLogDips += pr.LogDips25; pCfDips += pr.CfDips25;
                 foreach (var (k, v) in pr.ByPhase.Where(kv => !kv.Key.Contains(' '))) { pLog30 += v.LogLow30; pCf30 += v.CfLow30; pLog15 += v.LogLow15; pCf15 += v.CfLow15; }
             }
         var m = act / 60000.0;
         Console.WriteLine($"\n===== {pulls.Count} pulls, {m:0.0} active minutes");
         Console.WriteLine($"   tanks: logged deaths (not in a wipe) {tDeaths.Count}, the rules survive the killing blow in {tDeaths.Count(x => x.D.Survives)}; tanks the rules would lose that lived {tCf.Count}; rules' heals on a tank under 50% {tRulesLow / 1e6:0.00}M vs the real Sage {tRealLow / 1e6:0.00}M");
+        Console.WriteLine($"   tanks under 25%: tank-seconds logged {tLog25:0} rules {tCf25:0}; dips logged {tLogDips} rules {tCfDips}");
         foreach (var (k, v) in tPh.OrderBy(x => x.Key))
             Console.WriteLine($"     tank-seconds {k,-40} under 30%: logged {v[0],6:0} rules {v[1],6:0}   under 15%: logged {v[2],6:0} rules {v[3],6:0}   lowest: logged {v[5],3:0}% rules {v[4],3:0}%   rules-dead {v[7],5:0}  (pulls {v[6]})");
         foreach (var (pull, d) in tDeaths) Console.WriteLine($"     death #{pull} {SageSim.F(d.T)} {d.Phase} [{d.Segment}] {d.Tank}: {d.Cause}; rules {(d.Survives ? "SURVIVE" : "die")} ({d.MarginPct:+0;-0}%)");
@@ -394,6 +397,7 @@ switch (cmd)
         if (args.Contains("--party"))
         {
             Console.WriteLine($"   party (non-tanks): players the rules would lose that lived {pCf.Count}; player-seconds under 30%: logged {pLog30:0} rules {pCf30:0}; under 15%: logged {pLog15:0} rules {pCf15:0}");
+            Console.WriteLine($"   party (non-tanks) under 25%: player-seconds logged {pLog25:0} rules {pCf25:0}; dips logged {pLogDips} rules {pCfDips}");
             foreach (var g in pCf.GroupBy(x => string.Join(' ', x.D.Hit.Split(' ').TakeWhile(t => !t.EndsWith("k,") && !t.EndsWith('k')))).OrderByDescending(g => g.Count()))
                 Console.WriteLine($"     party lose x{g.Count()} {g.Key}: {string.Join("; ", g.Take(4).Select(x => $"#{x.Pull} {SageSim.F(x.D.T)} {x.D.Tank.Split(' ')[0]}"))}");
         }

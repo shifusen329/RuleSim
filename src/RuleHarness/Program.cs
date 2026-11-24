@@ -946,8 +946,9 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         planRules.Where(r => Id(r) is 16148 or 16161).All(r => Prop<bool>(r, "Hook")) && !planRules.Any(r => Id(r) is 36935 or 25758));
     E2E("DMU_Mit_GNB: Rampart (7531) and Camouflage (16140) on the busters", planRules.Count(r => Id(r) == 7531) == 2 && planRules.Count(r => Id(r) == 16140) == 2);
     var holLast = "Heart of Light (plan, last chance)";
-    E2E("DMU_Mit_GNB: all woven except the OT's Phase 5 Heart of Light (no target, downtime) and its last-chance Heart of Light",
-        planRules.Where(r => Prop<string>(r, "Name") is not ("Heart of Light (Phase 5, before Kefka is targetable)" or "Heart of Light (plan, last chance)" or "Sprint (Wings of Destruction bait, last chance)")).All(r => Prop<bool>(r, "Weave"))
+    E2E("DMU_Mit_GNB: all woven except the OT's Phase 5 Heart of Light (no target, downtime), its last-chance Heart of Light and the pull's Release Royal Guard",
+        planRules.Where(r => Prop<string>(r, "Name") is not ("Heart of Light (Phase 5, before Kefka is targetable)" or "Heart of Light (plan, last chance)" or "Sprint (Wings of Destruction bait, last chance)"
+            or "Release Royal Guard (OT, until Revolting Ruin III #1)")).All(r => Prop<bool>(r, "Weave"))
         && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("!hasTarget") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("ot") && Src(R(planRules, "Heart of Light (Phase 5, before Kefka is targetable)")).Contains("optP5EarlyHol")
         && Src(R(planRules, holLast)) == "optSheetMit && ot && otHolLate" && Id(R(planRules, holLast)) == 16160);
     // The user (2026-11-01): as OT, Heart of Light follows the Dancer's Shield Samba (same 15 s, same 90 s cooldown):
@@ -999,6 +1000,42 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             && Src(R(planRules, "Sprint (Wings of Destruction bait, last chance)")) == "wingsSprint && castsSeen(WingsOfDestruction) == 2"
             && gd["wingsSprint"].Contains("castsSeen(WingsOfDestruction) == 1 && sinceCast(WingsOfDestruction) >= 8.0") && gd["wingsSprint"].EndsWith("&& !buff(50)")
             && planRules.IndexOf(R(planRules, "Sprint (Wings of Destruction bait)")) < planRules.IndexOf(R(planRules, "Great Nebula (buster)")));
+        // 2026-11-24 (user: "Royal Guard is disabled when OT mits is enabled, and activate it before the first Revolting Ruin in
+        // P1"; scripts/dmu_tank_stance.py): as OT, Release Royal Guard at once (not woven: before the opener's first weaponskill,
+        // leaving Bloodfest's and No Mercy's slots) until 8.5 s in, then Royal Guard woven before Revolting Ruin III #1's cast
+        // (10.5-10.7 s), or in its bar's first 4 s; as MT neither.
+        string Stance(string name, int ot, int rr3, double rr3T, double ct, int opt = 1) => Eval(name, new()
+        {
+            [name] = gd[name].Replace("castsSeen(RevoltingRuinIII)", "rr3").Replace("sinceCast(RevoltingRuinIII)", "rr3T").Replace("combatTime", "ct"),
+            ["optOtStance"] = $"{opt}", ["ot"] = $"{ot}", ["rr3"] = $"{rr3}", ["rr3T"] = $"{rr3T}", ["ct"] = $"{ct}"
+        }) == 1 ? "1" : "0";
+        string Win(int ot, int rr3, double rr3T, double ct, int opt = 1) => Stance("stanceOff", ot, rr3, rr3T, ct, opt) + Stance("stanceOn", ot, rr3, rr3T, ct, opt);
+        var rgOff = R(planRules, "Release Royal Guard (OT, until Revolting Ruin III #1)");
+        var rgOn = R(planRules, "Royal Guard (OT, before Revolting Ruin III #1)");
+        E2E("DMU_Mit_GNB: Royal Guard as OT (optOtStance, on): released at once until 8.5 s, back on woven from 8.5 s to Revolting Ruin III #1's bar +4 s; nothing as MT",
+            gd["optOtStance"] == "1" && Id(rgOff) == 16142 && Prop<bool>(rgOff, "Hook") && !Prop<bool>(rgOff, "Weave") && Src(rgOff) == "stanceOff && buff(RoyalGuard)"
+            && Id(rgOn) == 16142 && Prop<bool>(rgOn, "Weave") && Src(rgOn) == "stanceOn && !buff(RoyalGuard)" && planRules.IndexOf(rgOff) == 1 && planRules.IndexOf(rgOn) == 2
+            && Win(1, 0, 999, 0.5) == "10" && Win(1, 0, 999, 8.4) == "10" && Win(1, 0, 999, 8.5) == "01" && Win(1, 0, 999, 10.4) == "01"
+            && Win(1, 1, 1.2, 11.8) == "01" && Win(1, 1, 4.0, 14.6) == "00" && Win(1, 2, 1.0, 120) == "00"
+            && Win(0, 0, 999, 0.5) == "00" && Win(0, 0, 999, 9) == "00" && Win(1, 0, 999, 0.5, opt: 0) == "00" && Win(1, 0, 999, 9, opt: 0) == "00",
+            $"{Win(1, 0, 999, 0.5)} {Win(1, 0, 999, 8.5)} {Win(1, 1, 1.2, 11.8)} {Win(0, 0, 999, 9)}");
+        // 2026-11-24 (user: "Add an option for WAR MT who takes the first Ultimate Embrace in P2 by themself with Holmgang, so the
+        // OT doesn't need to stack mits"): with optUe1Holmgang, as OT beside a Warrior, Ultimate Embrace #1 leaves the big-buster
+        // windows (Great Nebula, Rampart, Camouflage, Aurora) and Heart of Corundum's; #2 and the MT's stack are unchanged.
+        string Ue(int opt, int ot, int war) => Eval("ue1Solo", new()
+        {
+            ["ue1Solo"] = gd["ue1Solo"].Replace("partyJob(WAR)", "war"), ["optUe1Holmgang"] = $"{opt}", ["ot"] = $"{ot}", ["war"] = $"{war}"
+        }) == 1 ? "solo" : "stack";
+        double UeCast(int solo, int ueSeen) => Eval("ueCastMine", new()
+        {
+            ["ueCastMine"] = gd["ueCastMine"].Replace("castsSeen(UltimateEmbrace)", "ueSeen"), ["ueCast"] = "1", ["ue1Solo"] = $"{solo}", ["ueSeen"] = $"{ueSeen}"
+        });
+        E2E("DMU_Mit_GNB: Ultimate Embrace #1 alone for a Warrior MT (optUe1Holmgang, off): as OT beside a Warrior none of the stack; #2 unchanged",
+            gd["optUe1Holmgang"] == "0" && Ue(1, 1, 1) == "solo" && Ue(0, 1, 1) == "stack" && Ue(1, 0, 1) == "stack" && Ue(1, 1, 0) == "stack"
+            && gd["ue1Stack"] == "ue1Win && !ue1Solo" && gd["bigWin"].Contains("|| ue1Stack ||") && gd["nebulaBig"].Contains("|| ue1Stack ||")
+            && !System.Text.RegularExpressions.Regex.IsMatch(gd["bigWin"] + gd["nebulaBig"] + gd["twentyBig"] + gd["auroraWin"] + gd["hocWhen"], @"\bue1Win\b|\bueCast\b")
+            && gd["hocWhen"].Contains("|| ueCastMine ||") && UeCast(1, 1) == 0 && UeCast(1, 2) == 1 && UeCast(0, 1) == 1,
+            $"{Ue(1, 1, 1)} {UeCast(1, 1)} {UeCast(1, 2)}");
         E2E("DMU_Mit_PLD: Hallowed Ground (optHallowedGround, off by default) first: Hyperdrive #2 as MT, Revolting Ruin III #2 as OT, Thunder III #5 and Orchestra #2 in either slot",
             pd["optHallowedGround"] == "0" && Prop<string>(prs[0], "Name") == "Hallowed Ground (invulnerability busters)" && Src(prs[0]) == "hgWhen && noHg" && Id(prs[0]) == 30
             && pd["hgWhen"].Contains("hdMine && castsSeen(LightOfJudgment) == 2") && pd["hgWhen"].Contains("ot && castsSeen(RevoltingRuinIII) == 2")
@@ -1244,7 +1281,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         var sb = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = slotValue, ["optSuperbolide"] = "1" }])!;
         E2E($"DMU_Mit_GNB compiles with optSuperbolide = 1, optTankSlot = {slotValue}", Errors(sb).Count == 0, string.Join(" | ", Errors(sb)));
     }
-    E2E("DMU_Mit_GNB.json: every option labelled with help", opts.Count == 10 && opts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
+    // 12 since 2026-11-24: optOtStance (Royal Guard as OT) and optUe1Holmgang (Ultimate Embrace #1 alone for a Warrior MT).
+    E2E("DMU_Mit_GNB.json: every option labelled with help", opts.Count == 12 && opts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
         string.Join(", ", opts.Select(o => Prop<string>(o, "Name"))));
 }
 

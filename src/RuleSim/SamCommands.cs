@@ -439,6 +439,17 @@ internal static class SamCommands
         Row("Higanbana DoT potency (effective)", ticks, null);
         if (sim.DotLostOnSwitch) Row("  ... if kept through target changes", ticksKeep, null);
         Row("cast cancels", sim.Cancels, act.Cancels);
+        // The movement model's false cancels (2026-11-26, for FFLogs fights rebuilt by fflogs_pull.sh, whose positions come
+        // only with the players' own actions): the logged player's own completed casts it would have cancelled (moving in
+        // the cast's first cast - slide ms, as SamSim cancels), against all of them.
+        if (isSam)
+        {
+            var castMs = sim.CastTime(SamSim.Defs[SA.Midare]);
+            var real = w.R.Actions.Where(e => e.Source.Id == meId && e.Name is "Midare Setsugekka" or "Tendo Setsugekka" or "Higanbana" or "Ogi Namikiri" or "Tenka Goken" or "Tendo Goken" && e.T >= 0)
+                .GroupBy(e => e.T / 500).Select(g => g.First()).ToList();
+            var flagged = real.Count(e => Enumerable.Range(0, Math.Max(1, (castMs - sim.SlideMs) / 50)).Any(k => w.Moving(e.T - castMs + 50 * k)));
+            Console.WriteLine($"   {"  ... your own casts the movement model would cancel",-44} {flagged,8} of {real.Count}");
+        }
         Row("casts lost (target gone)", sim.CastsLostTarget, null);
         Row("Enpi", sim.Log.Count(e => e.What == "Enpi"), act.Counts.GetValueOrDefault("Enpi"));
         Row("out of melee (>3 y) while a target was up (s)", sim.OutOfMeleeMs / 1000.0, null, "0.0");
@@ -479,6 +490,22 @@ internal static class SamCommands
         if (detail)
             foreach (var t in sim.Tengentsus.Where(t => t.T >= 0))
                 Console.WriteLine($"      Tengentsu {F(t.T)} -> {(t.Hit > 0 ? $"{t.HitName} {F(t.Hit)} (+{(t.Hit - t.T) / 1000.0:0.0}s), saved {procs.Where(p => p.t.T == t.T).Select(p => p.V.Mit + p.V.Heal).FirstOrDefault():0.0}% HP" : "no hit (wasted)")}   [{t.Rule.Replace("DMU mitigation plan (Samurai): ", "")}]");
+        // The logged player's own Tengentsus, scored the same way (2026-11-26, user: "pull the top 5 SAM parses and compare
+        // against DMU_Mit_SAM.json"): each press catches the first hit on them in the next 4 s (the game's window), then
+        // ProcValue (10% of that hit, 10% of the next 9 s of hits, Foresight's regen up to the HP missing in the log).
+        if (isSam)
+        {
+            var realT = w.R.Actions.Where(e => e.Source.Id == meId && e.Name == "Tengentsu" && e.T >= 0).Select(e => e.T).Distinct().OrderBy(v => v).ToList();
+            var realProcs = realT.Select(t => (T: t, Hit: sim.MergedHits.FirstOrDefault(h => h.T > t && h.T <= t + 4000))).ToList();
+            var caught = realProcs.Where(p => p.Hit.T > 0).Select(p => (p, V: sim.ProcValue(p.Hit.T, p.Hit.Pct))).ToList();
+            Console.WriteLine($"   Tengentsu (you): {realT.Count} presses, {caught.Count} caught a hit; HP saved {caught.Sum(p => p.V.Mit + p.V.Heal):0.0}% of max HP " +
+                              $"(mitigation {caught.Sum(p => p.V.Mit):0.0}%, regen {caught.Sum(p => p.V.Heal):0.0}%)");
+            if (detail)
+                foreach (var p in realProcs)
+                    Console.WriteLine($"      you {F(p.T)} -> {(p.Hit.T > 0 ? $"{p.Hit.Name} {F(p.Hit.T)} (+{(p.Hit.T - p.T) / 1000.0:0.0}s), saved {caught.Where(c => c.p.T == p.T).Select(c => c.V.Mit + c.V.Heal).FirstOrDefault():0.0}% HP" : "no hit (wasted)")}");
+            var realFeintsMine = w.R.Actions.Where(e => e.Source.Id == meId && e.Name == "Feint" && e.T >= 0).GroupBy(e => e.T / 1000).Select(g => g.First()).ToList();
+            Console.WriteLine($"   Feint presses (you): {string.Join(", ", realFeintsMine.Select(e => $"{F(e.T)} on {e.PrimaryTarget?.Name}"))}");
+        }
         // Feint
         var slots = FeintSlots(x, sheet, meId);
         foreach (var col in new[] { "D1", "D2" })

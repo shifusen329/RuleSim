@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Tank stances, Provoke/Shirk and Kefka's target in Dancing Mad's Phase 1 to the first Ultimate Embrace (2026-11-24).
 
-  dmu_tank_stance.py <ACT log or folder> [...] [--since 20261124] [--to 60] [--job GNB]
+  dmu_tank_stance.py <ACT log or folder> [...] [--since 20261124] [--to 60] [--job GNB] [--actions]
 
 User, 2026-11-24: "update DMU_Mit_GNB.json so that Royal Guard is disabled when OT mits is enabled, and activate it before
 the first Revolting Ruin in P1." Per pull: each tank's stance (Royal Guard, Defiance, Grit, Iron Will) at the pull and
 every change after it, Provoke/Shirk presses (target), the targets of Kefka's auto-attacks as they change, Revolting Ruin
 III casts (start, target) and the players their hits landed on, and Ultimate Embrace #1 (start, target, players hit, the
 invulnerabilities up). Times are seconds after the 260 line that starts combat. --to cuts the event list at that many
-seconds (Ultimate Embrace is always listed); --job keeps pulls with a tank on that job.
+seconds (Ultimate Embrace is always listed); --job keeps pulls with a tank on that job. --actions also lists every action
+of the OT on that job (the tank Revolting Ruin III #1 was not cast at) up to --to, e.g. to find a free weave slot before the
+cast (2026-11-26, the Paladin plan's Iron Will).
 """
 import argparse
 import datetime as dt
@@ -74,7 +76,7 @@ def pulls(path, since):
                 continue
             if l[3] == '1' and T is None:
                 T = ts(l[1])
-                cur = {'T': T, 'file': os.path.basename(path), 'stance0': dict(stance), 'ev': [], 'autos': [], 'rr3': [], 'ue': [], 'party': set(),
+                cur = {'T': T, 'file': os.path.basename(path), 'stance0': dict(stance), 'ev': [], 'autos': [], 'rr3': [], 'ue': [], 'party': set(), 'acts': [],
                        'jobs': jobs, 'names': names}
             elif l[3] == '0' and T is not None:
                 cur['jobs'], cur['names'] = dict(jobs), dict(names)
@@ -105,6 +107,8 @@ def pulls(path, since):
                             c['hit'].append((round(r - c['t'], 1), l[6], sorted(invuln.get(l[6], ()))))
             if l[2][:1] == '1':
                 cur['party'].add(l[2])
+                if r <= 60 and (not cur['acts'] or cur['acts'][-1][1:] != (l[2], l[5]) or r - cur['acts'][-1][0] > 0.5):
+                    cur['acts'].append((r, l[2], l[5]))
             if l[2][:1] == '1' and l[5] in PRESS:
                 if not cur['ev'] or cur['ev'][-1][1:] != (l[2], l[5]) or r - cur['ev'][-1][0] > 1:
                     cur['ev'].append((r, l[2], l[5] + (f" -> {l[7]}" if l[5] in ('Provoke', 'Shirk') else '')))
@@ -119,6 +123,7 @@ def main():
     ap.add_argument('--since')
     ap.add_argument('--to', type=float, default=40)
     ap.add_argument('--job')
+    ap.add_argument('--actions', action='store_true')
     a = ap.parse_args()
     for path in logs(a.paths):
         for c in pulls(path, a.since):
@@ -138,6 +143,10 @@ def main():
                     ', '.join(f"+{d} {nm(w)}" + (f" [{'/'.join(inv)}]" if inv else '') for d, w, inv in x['hit'])) for k, x in enumerate(c['ue'][:1])]
             for r, s in sorted(ev):
                 print(f"   {r:7.1f}  {s}")
+            if a.actions and a.job and c['rr3']:
+                ots = [i for i, j in tanks.items() if j == a.job and i != c['rr3'][0]['tgt']]
+                for o in ots:
+                    print(f"   OT {nm(o)} actions: " + '  '.join(f"{r:.1f} {n}" for r, w, n in c['acts'] if w == o and r <= a.to and n != 'attack'))
 
 
 if __name__ == '__main__':

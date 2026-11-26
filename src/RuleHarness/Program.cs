@@ -1381,6 +1381,37 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
     var withOptions = engine.GetMethod("CompileWithOptions", BindingFlags.NonPublic | BindingFlags.Static)!;
     var ot = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = "2" }])!;
     E2E("DMU_Mit_PLD compiles with optTankSlot = 2 (OT)", Errors(ot).Count == 0 && Prop<string>(Opt(ot, "optTankSlot"), "Value") == "2", string.Join(" | ", Errors(ot)));
+    // 2026-11-26 (user: "update DMU_Mit_PLD.json with the same features as the GNB options when OT is selected"): Iron Will
+    // as OT with the Gunbreaker plan's Royal Guard windows (released at once until 8.5 s, back on woven before Revolting Ruin
+    // III #1 or in its bar's first 4 s), and Ultimate Embrace #1 alone for a Warrior MT (optUe1Holmgang): Rampart/Guardian,
+    // Holy Sheltron and Bulwark leave it; Intervention on the MT keeps ueCast.
+    {
+        Dictionary<string, string> Defs(string file) => ((IEnumerable)Prop<object>(Rules(file), "Defines")).Cast<object>()
+            .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+        var pd = Defs("DMU_Mit_PLD.json");
+        var gd = Defs("DMU_Mit_GNB.json");
+        var iwOff = R(planRules, "Release Iron Will (OT, until Revolting Ruin III #1)");
+        var iwOn = R(planRules, "Iron Will (OT, before Revolting Ruin III #1)");
+        E2E("DMU_Mit_PLD: Iron Will as OT (optOtStance, on): the Gunbreaker plan's Royal Guard windows; released at once through Iron Will's hook, back on woven; after Hallowed Ground",
+            pd["optOtStance"] == "1" && pd["stanceOff"] == gd["stanceOff"] && pd["stanceOn"] == gd["stanceOn"]
+            && Prop<uint>(iwOff, "ActionId") == 28 && Prop<bool>(iwOff, "Hook") && !Prop<bool>(iwOff, "Weave") && Prop<string>(iwOff, "WhenSource") == "stanceOff && buff(IronWill)"
+            && Prop<uint>(iwOn, "ActionId") == 28 && Prop<bool>(iwOn, "Weave") && Prop<string>(iwOn, "WhenSource") == "stanceOn && !buff(IronWill)"
+            && planRules.IndexOf(iwOff) == 1 && planRules.IndexOf(iwOn) == 2
+            && planRules.Where(r => r != iwOff).All(r => Prop<bool>(r, "Weave")));
+        var own = pd["bigWin"] + pd["sheltronWhen"] + pd["bulwarkWhen"];
+        E2E("DMU_Mit_PLD: Ultimate Embrace #1 alone for a Warrior MT (optUe1Holmgang, off): the Gunbreaker plan's defines; Rampart/Guardian, Holy Sheltron, Bulwark use them; Intervention unchanged",
+            pd["optUe1Holmgang"] == "0" && pd["ue1Solo"] == gd["ue1Solo"] && pd["ue1Stack"] == gd["ue1Stack"] && pd["ueCastMine"] == gd["ueCastMine"]
+            && pd["bigWin"].Contains("|| ue1Stack ||") && pd["sheltronWhen"].Contains("|| ueCastMine ||") && pd["bulwarkWhen"].Contains("|| ueCastMine ||")
+            && !System.Text.RegularExpressions.Regex.IsMatch(own, @"\bue1Win\b|\bueCast\b") && pd["coTankWhen"].Contains("ueCast && oath >= 100"));
+        var popts = ((IEnumerable)Prop<object>(plan, "Options")).Cast<object>().ToList();
+        E2E("DMU_Mit_PLD.json: every option labelled with help (9 since 2026-11-26)", popts.Count == 9 && popts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
+            string.Join(", ", popts.Select(o => Prop<string>(o, "Name"))));
+        foreach (var o in new[] { "optOtStance", "optUe1Holmgang" })
+        {
+            var on = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = "2", [o] = o == "optOtStance" ? "0" : "1" }])!;
+            E2E($"DMU_Mit_PLD compiles as OT with {o} flipped", Errors(on).Count == 0, string.Join(" | ", Errors(on)));
+        }
+    }
 }
 
 // ---- Dancer: two modes (2026-10-23) ----

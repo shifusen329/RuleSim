@@ -1042,7 +1042,7 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
             && pd["hgWhen"].Contains("castsSeen(ThunderIII) == 5") && pd["hgWhen"].Contains("castsSeen(MaddeningOrchestra) == 2"));
         E2E("DMU_Mit_PLD: Thunder III #3/#5 get no other mitigation; Bulwark on Wings #2 in either slot; Holy Sheltron on Ultimate Embrace #2, not Wings #2",
             pd["thunderMit"].StartsWith("thunderSet && ") && pd["bulwarkWhen"].Contains("castsSeen(WingsOfDestruction) == 2 && sinceCast(WingsOfDestruction) >= 1.2")
-            && !pd["sheltronWhen"].Contains("Wings") && pd["sheltronWhen"].Contains("thunderSet && sinceCast(ThunderIII) >= 3.0"));
+            && !pd["sheltronWhen"].Contains("Wings") && pd["sheltronWhen"].Contains("thunderSet && sinceCast(ThunderIII) >= 4.2"));
     }
     // The user (2026-11-01): No Mercy is held with Bloodfest at the end of Phase 1 under optP1BurstHoldHp, and (held, or
     // back after Phase 1's forced end at 198 s) until Phase 2's first 2-minute window, Forsaken + 13 s; meanwhile the
@@ -1397,18 +1397,46 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
             && Prop<uint>(iwOff, "ActionId") == 28 && Prop<bool>(iwOff, "Hook") && !Prop<bool>(iwOff, "Weave") && Prop<string>(iwOff, "WhenSource") == "stanceOff && buff(IronWill)"
             && Prop<uint>(iwOn, "ActionId") == 28 && Prop<bool>(iwOn, "Weave") && Prop<string>(iwOn, "WhenSource") == "stanceOn && !buff(IronWill)"
             && planRules.IndexOf(iwOff) == 1 && planRules.IndexOf(iwOn) == 2
-            && planRules.Where(r => r != iwOff).All(r => Prop<bool>(r, "Weave")));
+            && planRules.Where(r => r != iwOff && Prop<string>(r, "Name") != "Sprint (Wings of Destruction bait, last chance)").All(r => Prop<bool>(r, "Weave")));
+        // 2026-11-26 (user: "add the sprint timing for the end of p2"): the Gunbreaker plan's Wings of Destruction Sprint.
+        var spW = R(planRules, "Sprint (Wings of Destruction bait)");
+        var spL = R(planRules, "Sprint (Wings of Destruction bait, last chance)");
+        E2E("DMU_Mit_PLD: Sprint for the Wings of Destruction bait (optWingsSprint, on): the Gunbreaker plan's window, woven, at once as the second Wings starts, before the Wings stack",
+            pd["optWingsSprint"] == "1" && pd["wingsSprint"] == gd["wingsSprint"] && Prop<uint>(spW, "ActionId") == 3 && Prop<bool>(spW, "Weave") && Prop<string>(spW, "WhenSource") == "wingsSprint"
+            && Prop<uint>(spL, "ActionId") == 3 && !Prop<bool>(spL, "Weave") && Prop<string>(spL, "WhenSource") == "wingsSprint && castsSeen(WingsOfDestruction) == 2"
+            && planRules.IndexOf(spW) < planRules.IndexOf(R(planRules, "Guardian (buster, with Rampart)")));
+        // 2026-11-26 (user: "Fix the Reprisal and Knight's Benediction timing"; scripts/dmu_press_timeline.py on that day's
+        // pulls). Knight's Resolve is 4 s: Holy Sheltron's lands as you press it, Intervention's 0.8 s later on the other tank.
+        // Revolting Ruin III hits +5.1 and +8.2-8.4, Hyperdrive +8.1, +10.2, +12.3, Thunder III +5.1 or +8.1.
+        double Start(string define, string anchor)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(pd[define], System.Text.RegularExpressions.Regex.Escape($"sinceCast({anchor}) >= ") + @"([\d.]+)");
+            return m.Success ? double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : -1;
+        }
+        var rrSh = Start("sheltronWhen", "RevoltingRuinIII"); var hdSh = Start("sheltronWhen", "LightOfJudgment");
+        var thSh = Start("sheltronWhen", "ThunderIII"); var rrIv = Start("coTankWhen", "RevoltingRuinIII"); var hdIv = Start("coTankWhen", "LightOfJudgment");
+        E2E("DMU_Mit_PLD: Knight's Resolve reaches the big Revolting Ruin III hit (+8.4) and two Hyperdrive hits from each window's start; Thunder III's either hit",
+            rrSh + 4 >= 8.4 && rrSh <= 5.0 && hdSh + 4 >= 10.2 && hdSh <= 8.0 && thSh + 4 >= 8.1 && thSh <= 5.1
+            && rrIv + 0.8 + 4 >= 8.4 && rrIv + 0.8 <= 5.0 && hdIv + 0.8 + 4 >= 10.2 && hdIv + 0.8 <= 8.0,
+            $"Sheltron RR3 {rrSh} HD {hdSh} TH {thSh}; Intervention RR3 {rrIv} HD {hdIv}");
+        E2E("DMU_Mit_PLD: Bulwark's 10 s reach Hyperdrive #1's last hit (+12.3); no spare-Oath Holy Sheltron / Intervention before Revolting Ruin III #1 has hit",
+            pd["bulwarkWhen"].Contains("hd1Mine && sinceCast(LightOfJudgment) >= 2.5") && pd["oathFree"].StartsWith("optFreeOath && !oathOpener && ")
+            && pd["oathOpener"] == "castsSeen(RevoltingRuinIII) == 0 || castsSeen(RevoltingRuinIII) == 1 && sinceCast(RevoltingRuinIII) < 9");
+        // The third Mystery Magic's Reprisal from Graven Image #3 + 12 s (the user leaves Kefka before the cast), as in the
+        // Gunbreaker plan; it still reaches Flagrant Fire III (Graven Image +26.6) after landing 0.6 s after the press.
+        E2E("DMU_Mit_PLD: the OT's third Mystery Magic Reprisal from Graven Image #3 + 12 s, the Gunbreaker plan's window",
+            pd["otMm3Rep"] == gd["otMm3Rep"] && pd["otMm3Rep"].Contains("sinceCast(GravenImage) >= 12.0") && 12.0 + 0.6 + 15 >= 26.6);
         var own = pd["bigWin"] + pd["sheltronWhen"] + pd["bulwarkWhen"];
         E2E("DMU_Mit_PLD: Ultimate Embrace #1 alone for a Warrior MT (optUe1Holmgang, off): the Gunbreaker plan's defines; Rampart/Guardian, Holy Sheltron, Bulwark use them; Intervention unchanged",
             pd["optUe1Holmgang"] == "0" && pd["ue1Solo"] == gd["ue1Solo"] && pd["ue1Stack"] == gd["ue1Stack"] && pd["ueCastMine"] == gd["ueCastMine"]
             && pd["bigWin"].Contains("|| ue1Stack ||") && pd["sheltronWhen"].Contains("|| ueCastMine ||") && pd["bulwarkWhen"].Contains("|| ueCastMine ||")
             && !System.Text.RegularExpressions.Regex.IsMatch(own, @"\bue1Win\b|\bueCast\b") && pd["coTankWhen"].Contains("ueCast && oath >= 100"));
         var popts = ((IEnumerable)Prop<object>(plan, "Options")).Cast<object>().ToList();
-        E2E("DMU_Mit_PLD.json: every option labelled with help (9 since 2026-11-26)", popts.Count == 9 && popts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
+        E2E("DMU_Mit_PLD.json: every option labelled with help (10 since 2026-11-26: optOtStance, optUe1Holmgang, optWingsSprint)", popts.Count == 10 && popts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
             string.Join(", ", popts.Select(o => Prop<string>(o, "Name"))));
-        foreach (var o in new[] { "optOtStance", "optUe1Holmgang" })
+        foreach (var o in new[] { "optOtStance", "optUe1Holmgang", "optWingsSprint" })
         {
-            var on = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = "2", [o] = o == "optOtStance" ? "0" : "1" }])!;
+            var on = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = "2", [o] = o == "optUe1Holmgang" ? "1" : "0" }])!;
             E2E($"DMU_Mit_PLD compiles as OT with {o} flipped", Errors(on).Count == 0, string.Join(" | ", Errors(on)));
         }
     }

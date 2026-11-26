@@ -1686,10 +1686,18 @@ E2E("WAR examples embedded", new[] { "WAR_ST", "WAR_AoE", "DMU_Mit_WAR" }.All(n 
     var planRules = RuleList(planSet);
     E2E("DMU_Mit_WAR: layer, zone 1363, replaces Heavy Swing + Overpower", Prop<bool>(planSet, "Layer") && Prop<string>(planSet, "WhenSource").Contains("1363")
         && ((HashSet<uint>)Prop<object>(planSet, "Replaces")).SetEquals([31u, 41u]));
-    E2E("DMU_Mit_WAR: Damnation through Vengeance's hook, Bloodwhetting through Raw Intuition's, Nascent Flash on the other tank, Shake It Off first",
+    // Shake It Off before everything it dispels (Damnation 44, Thrill 40, Bloodwhetting 3551); since 2026-11-26 Holmgang,
+    // the OT's Defiance and the Wings Sprint come before it. All woven except the pull's Release Defiance and the two last
+    // chances (Holmgang for Ultimate Embrace #1, Sprint).
+    var sioIx = planRules.IndexOf(R(planRules, "Shake It Off (plan)"));
+    var notWoven = new[] { "Release Defiance (OT, until Revolting Ruin III #1)", "Holmgang (Ultimate Embrace #1 alone, last chance)", "Sprint (Wings of Destruction bait, last chance)" };
+    E2E("DMU_Mit_WAR: Damnation through Vengeance's hook, Bloodwhetting through Raw Intuition's, Nascent Flash on the other tank, Shake It Off before what it dispels",
         Hooked(planRules, "Damnation (buster)", 44) && Hooked(planRules, "Damnation (buster, one)", 44) && Hooked(planRules, "Bloodwhetting (buster)", 3551)
         && R(planRules, "Nascent Flash (other tank's buster)").GetType().GetProperty("TargetSource")!.GetValue(R(planRules, "Nascent Flash (other tank's buster)"))?.ToString() == "tank"
-        && Prop<uint>(planRules[0], "ActionId") == 7388 && planRules.All(r => Prop<bool>(r, "Weave")));
+        && Prop<uint>(planRules[sioIx], "ActionId") == 7388 && planRules.Take(sioIx).All(r => Prop<uint>(r, "ActionId") is 43 or 48 or 3)
+        && planRules.Where(r => Prop<uint>(r, "ActionId") is 44 or 40 or 3551).All(r => planRules.IndexOf(r) > sioIx)
+        && planRules.Where(r => !notWoven.Contains(Prop<string>(r, "Name"))).All(r => Prop<bool>(r, "Weave"))
+        && notWoven.All(n => !Prop<bool>(R(planRules, n), "Weave")));
     // Shake It Off dispels Damnation / Thrill / Bloodwhetting: those wait while it is due (sioFirst); it waits while they are up.
     E2E("DMU_Mit_WAR: Damnation, Thrill and Bloodwhetting wait for a due Shake It Off; Shake It Off waits while they are up",
         planRules.Where(r => Prop<uint>(r, "ActionId") is 44 or 40 or 3551).All(r => Prop<string>(r, "WhenSource").Contains("!sioFirst"))
@@ -1698,8 +1706,13 @@ E2E("WAR examples embedded", new[] { "WAR_ST", "WAR_AoE", "DMU_Mit_WAR" }.All(n 
         planRules.Where(r => Prop<uint>(r, "ActionId") is 40 or 3551 or 16464).All(r => Prop<string>(r, "WhenSource").Contains("!noHeal"))
         && File.ReadAllText(planPath).Contains("\"sioWhen\": \"optSheetMit && if(ot, otSio, mtSio) && !noHeal\""));
     var manual = new uint[] { 43, 7533, 7537, 3552 }; // Holmgang, Provoke, Shirk, Equilibrium
-    E2E("WAR files never press Holmgang, Provoke, Shirk or Equilibrium",
-        new[] { "WAR_ST.json", "WAR_AoE.json", "DMU_Mit_WAR.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Prop<uint>(r, "ActionId")))));
+    // Holmgang (2026-11-26, user: "update DMU_Mit_WAR.json with the same patterns as the other tanks"): only the plan's
+    // rules, behind optHolmgang (holmWhen) or optUe1Holmgang (holmUe1), both off by default, as Superbolide and Hallowed Ground.
+    E2E("WAR files never press Provoke, Shirk or Equilibrium; Holmgang only in DMU_Mit_WAR behind optHolmgang / optUe1Holmgang (off), on you",
+        new[] { "WAR_ST.json", "WAR_AoE.json", "DMU_Mit_WAR.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Prop<uint>(r, "ActionId"))
+            || f == "DMU_Mit_WAR.json" && Prop<uint>(r, "ActionId") == 43 && (Prop<string>(r, "WhenSource").StartsWith("holmWhen && noHolm") || Prop<string>(r, "WhenSource").StartsWith("holmUe1 && noHolm"))
+               && r.GetType().GetProperty("TargetSource")!.GetValue(r)?.ToString() == "self"))
+        && planText.Contains("\"optHolmgang\": \"0\"") && planText.Contains("\"optUe1Holmgang\": \"0\"") && planText.Contains("\"holmWhen\": \"optHolmgang && ("));
     // Onslaught (7386) is a dash: always keep one charge for the user's own gap closes, and only from the hitbox ring.
     var onslaught = new[] { st, aoe, planRules }.SelectMany(rs => rs).Where(r => Prop<uint>(r, "ActionId") == 7386).ToList();
     var warDefs = new[] { "WAR_ST.json", "WAR_AoE.json" }.Select(f => File.ReadAllText(Path.Combine(examples, f))).ToList();
@@ -1717,6 +1730,54 @@ E2E("WAR examples embedded", new[] { "WAR_ST", "WAR_AoE", "DMU_Mit_WAR" }.All(n 
     var withOptions = engine.GetMethod("CompileWithOptions", BindingFlags.NonPublic | BindingFlags.Static)!;
     var ot = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = "2" }])!;
     E2E("DMU_Mit_WAR compiles with optTankSlot = 2 (OT)", Errors(ot).Count == 0 && Prop<string>(Opt(ot, "optTankSlot"), "Value") == "2", string.Join(" | ", Errors(ot)));
+    // The other tanks' patterns (2026-11-26): the same defines as the Gunbreaker plan where they mean the same thing.
+    {
+        Dictionary<string, string> Defs(string file) => ((IEnumerable)Prop<object>(Rules(file), "Defines")).Cast<object>()
+            .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+        var wd = Defs("DMU_Mit_WAR.json");
+        var gd = Defs("DMU_Mit_GNB.json");
+        E2E("DMU_Mit_WAR: Defiance as OT, Ultimate Embrace #1 alone beside a Warrior MT, the Wings Sprint, the third Mystery Magic Reprisal and Thunder III #2/#4/#6: the Gunbreaker plan's defines",
+            wd["stanceOff"] == gd["stanceOff"] && wd["stanceOn"] == gd["stanceOn"] && wd["ue1Solo"] == gd["ue1Solo"] && wd["wingsSprint"] == gd["wingsSprint"]
+            && wd["otMm3Rep"] == gd["otMm3Rep"] && wd["thunderSet"] == gd["thunderSet"] && wd["thunderMit"].StartsWith("thunderSet && ")
+            && wd["holmSetA"] == gd["bolideSetA"].Replace("optBolideSet", "optHolmSet") && wd["optOtStance"] == "1" && wd["optWingsSprint"] == "1"
+            && Prop<string>(R(planRules, "Release Defiance (OT, until Revolting Ruin III #1)"), "WhenSource") == "stanceOff && buff(Defiance)"
+            && Prop<bool>(R(planRules, "Release Defiance (OT, until Revolting Ruin III #1)"), "Hook") && Prop<uint>(R(planRules, "Defiance (OT, before Revolting Ruin III #1)"), "ActionId") == 48);
+        // Holmgang's windows: the Gunbreaker plan's Superbolide ones (its status is on you as you press it), Hyperdrive #2 not
+        // when it goes on Ultimate Embrace #1 instead; Ultimate Embrace #1's hit is 5.0 s into the cast.
+        var bw = gd["bolideWhen"].Replace("optSuperbolide", "optHolmgang").Replace("bolideSetA", "holmSetA").Replace("hdMine && castsSeen(LightOfJudgment) == 2", "!ue1Holm && hdMine && castsSeen(LightOfJudgment) == 2");
+        E2E("DMU_Mit_WAR: Holmgang on the Gunbreaker plan's invulnerability windows (not Hyperdrive #2 with Ultimate Embrace #1 alone); Ultimate Embrace #1 1.0-4.6 s, at once from 3.8 s",
+            wd["holmWhen"] == bw && wd["holmUe1"].Contains("sinceCast(UltimateEmbrace) >= 1.0 && sinceCast(UltimateEmbrace) < 4.6") && wd["ue1Holm"] == "optUe1Holmgang && !ot"
+            && Prop<string>(R(planRules, "Holmgang (Ultimate Embrace #1 alone, last chance)"), "WhenSource") == "holmUe1 && noHolm && sinceCast(UltimateEmbrace) >= 3.8",
+            wd["holmWhen"] + " | " + bw);
+        // Stem the Flow (4 s) lands 0.6-0.7 s after Bloodwhetting / Nascent Flash: from each window's start it reaches the big
+        // Revolting Ruin III hit (+8.4), two Hyperdrive hits (+10.2) and either Thunder III hit (+8.1).
+        double St(string define, string anchor)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(wd[define], System.Text.RegularExpressions.Regex.Escape($"sinceCast({anchor}) >= ") + @"([0-9.]+)");
+            return m.Success ? double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : -1;
+        }
+        var (bRr, bHd, bTh, nRr, nHd) = (St("bwWhen", "RevoltingRuinIII"), St("bwWhen", "LightOfJudgment"), St("bwWhen", "ThunderIII"), St("nfWhen", "RevoltingRuinIII"), St("nfWhen", "LightOfJudgment"));
+        E2E("DMU_Mit_WAR: Stem the Flow reaches the big Revolting Ruin III hit, two Hyperdrive hits and either Thunder III hit from each window's start; Bloodwhetting on Ultimate Embrace #2, not Wings #2; Wings #2 both tanks",
+            bRr + 0.6 + 4 >= 8.4 && bRr + 0.6 <= 5.1 && bHd + 0.6 + 4 >= 10.2 && bHd + 0.6 <= 8.1 && bTh + 0.6 + 4 >= 8.1 && bTh + 0.6 <= 5.1
+            && nRr + 0.7 + 4 >= 8.4 && nRr + 0.7 <= 5.1 && nHd + 0.7 + 4 >= 10.2 && nHd + 0.7 <= 8.1
+            && !wd["bwWhen"].Contains("wings2") && wd["bwWhen"].Contains("|| ueCastMine ||") && wd["wings2"] == "castsSeen(WingsOfDestruction) == 2 && enemyCast(WingsOfDestruction)"
+            && wd["thrillBig"].Contains("wings2 && sinceCast(WingsOfDestruction) >= 1.8"),
+            $"BW {bRr} {bHd} {bTh}; NF {nRr} {nHd}");
+        E2E("DMU_Mit_WAR: Ultimate Embrace #1 alone: no stack as the Holmgang MT or as the OT beside one; Hyperdrive #2 then gets the stack; Rampart and Thrill on Thunder III #2/#6",
+            wd["ue1Stack"] == "ue1Win && !ue1Solo && !ue1Holm" && wd["ueCastMine"] == "ueCast && !((ue1Solo || ue1Holm) && castsSeen(UltimateEmbrace) == 1)"
+            && wd["hdBig"] == "hd1Mine || ue1Holm && hdMine && castsSeen(LightOfJudgment) == 2"
+            && new[] { "bigWin", "damnBig", "thrillBig", "bwWhen" }.All(k => !System.Text.RegularExpressions.Regex.IsMatch(wd[k], "\\b(ue1Win|ueCast|hd1Mine)\\b"))
+            && wd["rampBig"].EndsWith("|| thunderPair") && wd["thrillBig"].EndsWith("|| thunderPair") && wd["thunderPair"] == gd["thunderPair"]);
+        var wopts = ((IEnumerable)Prop<object>(plan, "Options")).Cast<object>().ToList();
+        E2E("DMU_Mit_WAR.json: 10 options since 2026-11-26 (optHolmgang, optHolmSet, optUe1Holmgang, optOtStance, optWingsSprint)", wopts.Count == 10,
+            string.Join(", ", wopts.Select(o => Prop<string>(o, "Name"))));
+        foreach (var (o, v) in new[] { ("optHolmgang", "1"), ("optUe1Holmgang", "1"), ("optHolmSet", "2"), ("optOtStance", "0"), ("optWingsSprint", "0") })
+            foreach (var slotV in new[] { "1", "2" })
+            {
+                var c = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = slotV, [o] = v }])!;
+                E2E($"DMU_Mit_WAR compiles with {o} = {v}, optTankSlot = {slotV}", Errors(c).Count == 0, string.Join(" | ", Errors(c)));
+            }
+    }
     // Every "opt..." define has an options entry with a label and help.
     foreach (var f in new[] { "WAR_ST.json", "WAR_AoE.json", "DMU_Mit_WAR.json" })
     {

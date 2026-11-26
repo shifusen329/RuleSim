@@ -1158,7 +1158,8 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
     // read it (what waited on the cooldown carries on).
     (string File, string Opt, string Hold, (string Rule, string Has)[] Rules, (string Define, string Has)[] Defs)[] hpHolds =
     [
-        ("PLD_ST.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, cd(FightOrFlight))")]),
+        // PLD_ST's fofCd also counts down a Dancing Mad hold (2026-11-26, optDmuAlign) after the HP holds' 999.
+        ("PLD_ST.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, ")]),
         ("PLD_AoE.json", "optFoFHoldHp", "fofHpHold", [("Fight or Flight", "!fofHpHold"), ("Imperator", "cd(FightOrFlight) > 50")], [("fofCd", "if(fofHpHold || holdBurst, 999, cd(FightOrFlight))")]),
         ("GNB_ST.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "nmNow"), ("Bloodfest", "bfNow")], [("nmCd", "if(nmHpHold, 999,"), ("nmNow", "!nmHpHold"), ("bfNow", "!nmHpHold")]),
         ("GNB_AoE.json", "optNoMercyHoldHp", "nmHpHold", [("No Mercy", "nmNow"), ("Bloodfest", "bfNow")], [("nmCd", "if(nmHpHold, 999,"), ("nmNow", "!nmHpHold"), ("bfNow", "!nmHpHold")]),
@@ -1326,7 +1327,7 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
         var pd = ((IEnumerable)Prop<object>(st, "Defines")).Cast<object>()
             .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
         var fofOk = pd["fofOpenerOk"].Replace("justUsed(RoyalAuthority, 2.6)", "jr");
-        bool FofOk(int std, int early, double ct, int jr) => Eval(fofOk, new() { ["optStandardOpener"] = $"{std}", ["optOpenerEarlyFoF"] = $"{early}", ["combatTime"] = $"{ct}", ["jr"] = $"{jr}" }) == 1;
+        bool FofOk(int std, int early, double ct, int jr, int dmu = 0, int buffs = 0) => Eval(fofOk, new() { ["optStandardOpener"] = $"{std}", ["optOpenerEarlyFoF"] = $"{early}", ["combatTime"] = $"{ct}", ["jr"] = $"{jr}", ["dmuAlign"] = $"{dmu}", ["raidBuffs"] = $"{buffs}" }) == 1;
         bool Hold(int std, double ct, double raidIn) => Eval(pd["holdConf"], new()
         {
             ["optConfInRaidBuffs"] = "1", ["optStandardOpener"] = $"{std}", ["fofUp"] = "1", ["inMelee"] = "1", ["raidBuffs"] = "0", ["combatTime"] = $"{ct}",
@@ -1336,6 +1337,28 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
             pd["optStandardOpener"] == "0" && !FofOk(1, 1, 2, 0) && FofOk(1, 1, 7, 1) && FofOk(0, 1, 2, 0) && !FofOk(0, 0, 2, 0) && FofOk(1, 1, 13, 0));
         E2E("PLD_ST: standard opener: the Confiteor combo goes at once in the opener; the two-minute raid-buff wait stays",
             Hold(0, 7, 0) && !Hold(1, 7, 0) && Hold(1, 125, 3) && Hold(0, 125, 3));
+        // 2026-11-26 (user: "Fix the fight or flight timing so it aligns with the party's 2minute raid buff windows"): in
+        // Dancing Mad (optDmuAlign, on) the opener's Fight or Flight goes once a raid buff is on you, whichever opener; the
+        // Gunbreaker file's windows (a Fight or Flight back within 9 s of one waits for the buffs) and Phase 1-end hold to
+        // Phase 2's Forsaken + 13 s.
+        var gst = ((IEnumerable)Prop<object>(Prop<object>(Load(File.ReadAllText(Path.Combine(examples, "GNB_ST.json")), Path.Combine(examples, "GNB_ST.json")), "Set"), "Defines")).Cast<object>()
+            .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+        E2E("PLD_ST: Dancing Mad opener Fight or Flight once a raid buff is up, even with the standard opener (optDmuAlign); outside it as before",
+            pd["optDmuAlign"] == "1" && pd["dmuAlign"] == "optDmuAlign && zone == 1363 && inCombat"
+            && FofOk(1, 1, 2, 0, dmu: 1, buffs: 1) && !FofOk(1, 1, 2, 0, dmu: 1, buffs: 0) && !FofOk(1, 1, 2, 0, dmu: 0, buffs: 1) && FofOk(0, 1, 2, 0, dmu: 1, buffs: 0));
+        double P2(double ct, double cd, int mm, int ue, int fz, double fzT) => Eval("p2Wait", new()
+        {
+            ["p2Wait"] = pd["p2Wait"].Replace("cd(FightOrFlight)", "fcd").Replace("castsSeen(MysteryMagic)", "mm").Replace("castsSeen(UltimateEmbrace)", "ue").Replace("combatTime", "ct"),
+            ["p2Window"] = pd["p2Window"].Replace("castsSeen(Forsaken)", "fz").Replace("sinceCast(Forsaken)", "fzT"),
+            ["dmuAlign"] = "1", ["fcd"] = $"{cd}", ["mm"] = $"{mm}", ["ue"] = $"{ue}", ["ct"] = $"{ct}", ["fz"] = $"{fz}", ["fzT"] = $"{fzT}"
+        });
+        E2E("PLD_ST: Dancing Mad Fight or Flight held from Phase 1's third Mystery Magic (or if back after 198 s) to Phase 2's Forsaken + 13 s; the Gunbreaker windows",
+            pd["dmuWin"] == gst["dmuWin"] && pd["alignWait"] == gst["alignWait"] && pd["p2Window"] == gst["p2Window"]
+            && pd["fofHold"] == "p2Wait || alignWait" && R(stRules, "Fight or Flight").GetType().GetProperty("WhenSource")!.GetValue(R(stRules, "Fight or Flight"))!.ToString()!.Contains("!fofHold")
+            && P2(150, 0, 2, 0, 0, 0) == 0 && P2(150, 55, 2, 0, 0, 0) == 1 && P2(188, 0, 3, 0, 0, 0) == 1 && P2(215, 0, 3, 1, 0, 0) == 1
+            && P2(240, 0, 3, 1, 1, 12.9) == 1 && P2(242, 0, 3, 1, 1, 13.0) == 0 && P2(300, 0, 3, 2, 2, 60) == 0
+            && pd["fofCd"].Contains("if(p2Wait, max(cd(FightOrFlight), fofRelease)") && pd["fofRelease"] == gst["nmRelease"],
+            $"{P2(150, 0, 2, 0, 0, 0)} {P2(188, 0, 3, 0, 0, 0)} {P2(242, 0, 3, 1, 1, 13.0)}");
     }
     var planPath = Path.Combine(examples, "DMU_Mit_PLD.json");
     var planText = File.ReadAllText(planPath);

@@ -130,7 +130,7 @@ internal sealed class SamSim : IRuleRuntime
     public readonly List<(int T, string Phase, string Reason, string Rule, int Ms)> Idle = new();
     public int AvailMs, BusyMs, OutOfMeleeMs, BanaUpMs, DeadMs, IncapMs;
     public readonly Dictionary<string, (int Avail, int Busy, int Out, int Bana)> PhaseMs = new();
-    public readonly List<(int T, string Name, bool Needed, bool Geometry, bool TrueNorth, string Angle)> Positionals = new();
+    public readonly List<(int T, string Name, bool Needed, bool Geometry, bool TrueNorth, string Angle, bool Meikyo)> Positionals = new();
     public readonly List<(int T, string Rule, bool UsedByPositional)> TrueNorths = new();
     public readonly List<(int T, string Rule, int Hit, string HitName)> Tengentsus = new();
     public readonly List<(int T, string HitName, double Pct, bool Tengentsu)> HitsTaken = new();
@@ -704,7 +704,7 @@ internal sealed class SamSim : IRuleRuntime
                 var angle = AngleTo(target);
                 var geometry = angle == (d.Positional == 1 ? "rear" : "flank");
                 var tn = Has(SS.TrueNorth);
-                Positionals.Add((T, d.Name, needed, geometry, tn, angle));
+                Positionals.Add((T, d.Name, needed, geometry, tn, angle, meikyo));
                 if (!needed || geometry || tn) potency += d.PosBonus;
                 note = !needed ? "no positional needed" : geometry ? $"{angle} hit" : tn ? $"True North ({angle})" : $"MISSED ({angle})";
                 break;

@@ -332,6 +332,26 @@ if (malSet is not null)
     var malRules = ((IEnumerable)malSet.GetType().GetProperty("Rules")!.GetValue(malSet)!).Cast<object>().ToList();
     var wait = malRules.First(r => Prop<string>(r, "Name") == "Wait for the pull");
     E2E("Wait is Wrath's Cease", Prop<uint>(wait, "ActionId") == 1_000_004);
+    // 2026-11-26 (user: "There should be a rule that saves a True North charge for Meikyo and back to back Meikyo situations
+    // should only occur once every 6 rotations"): Meikyo's True North first among the oGCDs after the Meikyo presses (any
+    // charge); a combo's only when the next Meikyo keeps 1 charge, 2 before the 6th-minute double Meikyo.
+    var malDefs = ((IEnumerable)malSet.GetType().GetProperty("Defines")!.GetValue(malSet)!).Cast<object>()
+        .ToDictionary(d => (string)d.GetType().GetField("Item1")!.GetValue(d)!, d => (string)d.GetType().GetField("Item2")!.GetValue(d)!);
+    var tnM = malRules.First(r => Prop<string>(r, "Name") == "True North (Meikyo)");
+    var tnC = malRules.First(r => Prop<string>(r, "Name") == "True North");
+    int Ix(string n) => malRules.FindIndex(r => Prop<string>(r, "Name") == n);
+    double After(int ch, double chCd, double meikyoIn) => Eval("tnAfter", new()
+    {
+        ["tnAfter"] = malDefs["tnAfter"].Replace("charges(TrueNorth)", "ch").Replace("chargeCd(TrueNorth)", "chCd"), ["ch"] = $"{ch}", ["chCd"] = $"{chCd}", ["meikyoIn"] = $"{meikyoIn}"
+    });
+    E2E("SAM_Lv100_SlowMAL: True North kept for Meikyo (optTnForMeikyo, on): Meikyo's before Senei, a combo's only if the next Meikyo keeps its charge(s)",
+        malDefs["optTnForMeikyo"] == "1" && Prop<uint>(tnM, "ActionId") == 7546 && Prop<bool>(tnM, "Weave") && Prop<string>(tnM, "WhenSource").Contains("meikyo &&")
+        && Prop<string>(tnC, "WhenSource").Contains("tnComboOk") && !Prop<string>(tnC, "WhenSource").Contains("meikyo &&")
+        && Ix("True North (Meikyo)") < Ix("Senei") && Ix("True North (Meikyo)") > Ix("Spare Meikyo (6th-minute reset)")
+        && malDefs["tnNeed"] == "if(charges(MeikyoShisui) >= 2 && raidBurstDue, 2, 1)" && malDefs["tnComboOk"] == "!optTnForMeikyo || tnAfter >= tnNeed"
+        // 2 charges: one used now leaves 1, and 2 again if the Meikyo is 45 s away; 1 charge recharging in 10 s: 0 before it
+        && After(2, 0, 20) == 1 && After(2, 0, 50) == 2 && After(1, 10, 5) == 0 && After(1, 10, 12) == 1 && After(1, 10, 56) == 2,
+        $"{After(2, 0, 20)} {After(1, 10, 5)} {After(1, 10, 12)}");
 }
 
 var symbolsType = wrath.GetType("WrathCombo.CustomRules.JobRuleSymbols", true)!;

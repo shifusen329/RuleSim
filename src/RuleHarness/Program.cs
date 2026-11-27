@@ -352,6 +352,18 @@ if (malSet is not null)
         // 2 charges: one used now leaves 1, and 2 again if the Meikyo is 45 s away; 1 charge recharging in 10 s: 0 before it
         && After(2, 0, 20) == 1 && After(2, 0, 50) == 2 && After(1, 10, 5) == 0 && After(1, 10, 12) == 1 && After(1, 10, 56) == 2,
         $"{After(2, 0, 20)} {After(1, 10, 5)} {After(1, 10, 12)}");
+    // 2026-11-26 (user: "Account for the Meikyo held at the end of p1"): while p1Ending holds Meikyo, the next is Phase 2's
+    // (median 208.2 s over 216 pulls), so at 190 s a combo may spend the last charge if it is back within 18 s.
+    double MIn(int p1, double ct) => Eval("meikyoIn", new()
+    {
+        ["meikyoIn"] = malDefs["meikyoIn"].Replace("charges(MeikyoShisui)", "mch").Replace("chargeCd(MeikyoShisui)", "mcd").Replace("combatTime", "ct"),
+        ["meikyo"] = "0", ["p1Ending"] = $"{p1}", ["ct"] = $"{ct}", ["mch"] = "1", ["mcd"] = "0",
+        ["banaLeft"] = "0", ["banaIfNow"] = "10", ["gcd"] = "2.14", ["raidBurstDue"] = "0", ["raidDeadline"] = "99"
+    });
+    E2E("SAM_Lv100_SlowMAL: during the end-of-Phase-1 Meikyo hold the True North reserve counts to Phase 2's Meikyo (208 s)",
+        malDefs["meikyoIn"].Contains("if(p1Ending, max(0, 208 - combatTime)") && Math.Abs(MIn(1, 190) - 18) < 1e-6 && MIn(1, 210) == 0 && MIn(0, 190) == 0
+        && After(1, 15, MIn(1, 190)) == 1 && After(1, 25, MIn(1, 190)) == 0,
+        $"{MIn(1, 190)} {MIn(0, 190)}");
 }
 
 var symbolsType = wrath.GetType("WrathCombo.CustomRules.JobRuleSymbols", true)!;

@@ -577,6 +577,7 @@ internal static class SamCommands
         var pos = rs.SelectMany(r => r.X.Sim.Positionals.Where(p => p.T >= 0)).ToList();
         Console.WriteLine($"   positionals: rules hit {pos.Count(p => !p.Needed || p.Geometry)} by position + {pos.Count(p => p.Needed && !p.Geometry && p.TrueNorth)} by True North, missed {pos.Count(p => p.Needed && !p.Geometry && !p.TrueNorth)}; " +
                           $"logged (same geometry) hit {rs.Sum(r => r.Act.PosHit)} + TN {rs.Sum(r => r.Act.PosTn)}, missed {rs.Sum(r => r.Act.PosMiss)}");
+        Console.WriteLine($"   Sen already held when a finisher granted it: under Meikyo {rs.Sum(r => r.X.Sim.SenWastedMeikyo)}, in a combo {rs.Sum(r => r.X.Sim.SenWastedCombo)}");
         // Split by Meikyo (2026-11-26: the True North reserve for Meikyo, SAM_Lv100_SlowMAL optTnForMeikyo).
         foreach (var (label, mk) in new[] { ("under Meikyo", true), ("in a combo", false) })
         {

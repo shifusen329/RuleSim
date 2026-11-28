@@ -126,6 +126,8 @@ internal sealed class SamSim : IRuleRuntime
     public readonly List<DotApp> Dots = new();
     public readonly Dictionary<string, int> RuleFires = new();
     public int Cancels, Gcds, Unmodelled, KenkiWasted, MeditationWasted, CastsLostTarget;
+    /// <summary> Finishers that granted a Sen already held (2026-11-27: Meikyo stacks spent on held Sen at Phase 3's start). </summary>
+    public int SenWastedMeikyo, SenWastedCombo;
     public readonly List<(int T, string Name, string Rule, int MovedInMs)> CancelLog = new();
     public readonly List<(int T, string Phase, string Reason, string Rule, int Ms)> Idle = new();
     public int AvailMs, BusyMs, OutOfMeleeMs, BanaUpMs, DeadMs, IncapMs;
@@ -686,7 +688,7 @@ internal sealed class SamSim : IRuleRuntime
                 else ComboAction = 0;
                 break;
             case SA.Yukikaze:
-                if (meikyo || InCombo(SA.Gyofu)) { potency = d.ComboPotency; AddKenki(15, d.Name); Setsu = true; }
+                if (meikyo || InCombo(SA.Gyofu)) { potency = d.ComboPotency; AddKenki(15, d.Name); if (Setsu && T >= 0) { if (meikyo) SenWastedMeikyo++; else SenWastedCombo++; } Setsu = true; }
                 Combo(d.Id);
                 break;
             case SA.Gekko or SA.Kasha:
@@ -695,6 +697,7 @@ internal sealed class SamSim : IRuleRuntime
                 {
                     potency = d.ComboPotency;
                     AddKenki(10, d.Name);
+                    if ((d.Id == SA.Gekko ? Getsu : Ka) && T >= 0) { if (meikyo) SenWastedMeikyo++; else SenWastedCombo++; }
                     if (d.Id == SA.Gekko) Getsu = true; else Ka = true;
                     // Under Meikyo they grant Fugetsu/Fuka (not in the plain combo; the user's logs show only Jinpu/Shifu do).
                     if (meikyo) Give(d.Id == SA.Gekko ? SS.Fugetsu : SS.Fuka, 40000);

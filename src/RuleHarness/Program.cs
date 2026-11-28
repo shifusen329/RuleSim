@@ -1408,7 +1408,7 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
     E2E("PLD files never press Cover, Provoke or Shirk; Hallowed Ground only in DMU_Mit_PLD behind optHallowedGround, Passage of Arms only there for Light of Judgment #2 (loj2Passage)",
         new[] { "PLD_ST.json", "PLD_AoE.json", "DMU_Mit_PLD.json" }.All(f => RuleList(Rules(f)).All(r => !manual.Contains(Prop<uint>(r, "ActionId"))
             || f == "DMU_Mit_PLD.json" && Prop<uint>(r, "ActionId") == 30 && Prop<string>(r, "WhenSource") == "hgWhen && noHg"
-            || f == "DMU_Mit_PLD.json" && Prop<uint>(r, "ActionId") == 7385 && Prop<string>(r, "WhenSource").StartsWith("loj2Passage")))
+            || f == "DMU_Mit_PLD.json" && Prop<uint>(r, "ActionId") == 7385 && (Prop<string>(r, "WhenSource").StartsWith("loj2Passage") || Prop<string>(r, "WhenSource").StartsWith("loj3Passage"))))
         && File.ReadAllText(Path.Combine(examples, "DMU_Mit_PLD.json")).Contains("\"hgWhen\": \"optHallowedGround && ("));
     // Bulwark (22) on the tankbusters (the user's request, 2026-10-22): the DMU plan's busters and the marker elsewhere.
     E2E("DMU_Mit_PLD presses Bulwark on the busters", Prop<uint>(R(planRules, "Bulwark (buster)"), "ActionId") == 22);
@@ -1455,7 +1455,7 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
             && Prop<uint>(iwOff, "ActionId") == 28 && Prop<bool>(iwOff, "Hook") && !Prop<bool>(iwOff, "Weave") && Prop<string>(iwOff, "WhenSource") == "stanceOff && buff(IronWill)"
             && Prop<uint>(iwOn, "ActionId") == 28 && Prop<bool>(iwOn, "Weave") && Prop<string>(iwOn, "WhenSource") == "stanceOn && !buff(IronWill)"
             && planRules.IndexOf(iwOff) == 1 && planRules.IndexOf(iwOn) == 2
-            && planRules.Where(r => r != iwOff && Prop<string>(r, "Name") is not ("Sprint (Wings of Destruction bait, last chance)" or "Passage of Arms (Light of Judgment #2, OT, last chance)")).All(r => Prop<bool>(r, "Weave")));
+            && planRules.Where(r => r != iwOff && Prop<string>(r, "Name") is not ("Sprint (Wings of Destruction bait, last chance)" or "Passage of Arms (Light of Judgment #2, OT, last chance)" or "Passage of Arms (Phase 2 Light of Judgment, last chance)")).All(r => Prop<bool>(r, "Weave")));
         // 2026-11-26 (user: "add the sprint timing for the end of p2"): the Gunbreaker plan's Wings of Destruction Sprint.
         var spW = R(planRules, "Sprint (Wings of Destruction bait)");
         var spL = R(planRules, "Sprint (Wings of Destruction bait, last chance)");
@@ -1498,15 +1498,23 @@ E2E("PLD examples embedded", new[] { "PLD_ST", "PLD_AoE", "DMU_Mit_PLD" }.All(n 
             && Prop<uint>(poaL, "ActionId") == 7385 && !Prop<bool>(poaL, "Weave") && Prop<string>(poaL, "WhenSource") == "loj2Passage && sinceCast(LightOfJudgment) >= 3.4"
             && PoaWin(1.4, 1, 2) == 0 && PoaWin(1.5, 1, 2) == 1 && PoaWin(3.9, 1, 2) == 1 && PoaWin(4.0, 1, 2) == 0 && 3.9 + 0.7 <= 5.0
             && PoaWin(2.5, 0, 2) == 0 && PoaWin(2.5, 1, 1) == 0 && PoaWin(2.5, 1, 3) == 0 && PoaWin(2.5, 1, 2, opt: 0) == 0);
+        // 2026-11-27 (user: "weave in another Passage of Arms before the last Judgement of Light at the start of Trines in P2
+        // right before the P3 cutscene"): Phase 2's Light of Judgment (the third; Trine 13 s later), the same window, either slot.
+        var poa3W = R(planRules, "Passage of Arms (Phase 2 Light of Judgment)");
+        var poa3L = R(planRules, "Passage of Arms (Phase 2 Light of Judgment, last chance)");
+        E2E("DMU_Mit_PLD: Passage of Arms for Phase 2's Light of Judgment (optLoj3Passage, on): the second one's window on the third, in either slot, woven then at once from 3.4 s",
+            pd["optLoj3Passage"] == "1" && pd["loj3Passage"] == pd["loj2Passage"].Replace("optLoj2Passage && ot && ", "optLoj3Passage && ").Replace("castsSeen(LightOfJudgment) == 2", "castsSeen(LightOfJudgment) == 3")
+            && Prop<uint>(poa3W, "ActionId") == 7385 && Prop<bool>(poa3W, "Weave") && Prop<string>(poa3W, "WhenSource") == "loj3Passage"
+            && Prop<uint>(poa3L, "ActionId") == 7385 && !Prop<bool>(poa3L, "Weave") && Prop<string>(poa3L, "WhenSource") == "loj3Passage && sinceCast(LightOfJudgment) >= 3.4");
         var own = pd["bigWin"] + pd["sheltronWhen"] + pd["bulwarkWhen"];
         E2E("DMU_Mit_PLD: Ultimate Embrace #1 alone for a Warrior MT (optUe1Holmgang, off): the Gunbreaker plan's defines; Rampart/Guardian, Holy Sheltron, Bulwark use them; Intervention unchanged",
             pd["optUe1Holmgang"] == "0" && pd["ue1Solo"] == gd["ue1Solo"] && pd["ue1Stack"] == gd["ue1Stack"] && pd["ueCastMine"] == gd["ueCastMine"]
             && pd["bigWin"].Contains("|| ue1Stack ||") && pd["sheltronWhen"].Contains("|| ueCastMine ||") && pd["bulwarkWhen"].Contains("|| ueCastMine ||")
             && !System.Text.RegularExpressions.Regex.IsMatch(own, @"\bue1Win\b|\bueCast\b") && pd["coTankWhen"].Contains("ueCast && oath >= 100"));
         var popts = ((IEnumerable)Prop<object>(plan, "Options")).Cast<object>().ToList();
-        E2E("DMU_Mit_PLD.json: every option labelled with help (11 since 2026-11-26: optOtStance, optUe1Holmgang, optWingsSprint, optLoj2Passage)", popts.Count == 11 && popts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
+        E2E("DMU_Mit_PLD.json: every option labelled with help (12 since 2026-11-27: optOtStance, optUe1Holmgang, optWingsSprint, optLoj2Passage, optLoj3Passage)", popts.Count == 12 && popts.All(o => !string.IsNullOrEmpty(Prop<string>(o, "Help")) && Prop<string>(o, "Label") != Prop<string>(o, "Name")),
             string.Join(", ", popts.Select(o => Prop<string>(o, "Name"))));
-        foreach (var o in new[] { "optOtStance", "optUe1Holmgang", "optWingsSprint", "optLoj2Passage" })
+        foreach (var o in new[] { "optOtStance", "optUe1Holmgang", "optWingsSprint", "optLoj2Passage", "optLoj3Passage" })
         {
             var on = withOptions.Invoke(null, [planText, planPath, new Dictionary<string, string> { ["optTankSlot"] = "2", [o] = o == "optUe1Holmgang" ? "1" : "0" }])!;
             E2E($"DMU_Mit_PLD compiles as OT with {o} flipped", Errors(on).Count == 0, string.Join(" | ", Errors(on)));

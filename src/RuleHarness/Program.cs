@@ -1263,8 +1263,9 @@ E2E("GNB examples embedded", new[] { "GNB_ST", "GNB_AoE", "DMU_Mit_GNB" }.All(n 
         }
     }
     // 45 since 2026-11-17: the three healer plans' optAccFirstLine (1 or 2) went with the Accretions' line order. 47 since
-    // 2026-11-19: Sage's optTankShieldSting (0-3) in SGE_ST_DPS.json and its mirror in DMU_Mit_SGE.json.
-    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 47,
+    // 2026-11-19: Sage's optTankShieldSting (0-3) in SGE_ST_DPS.json and its mirror in DMU_Mit_SGE.json. 49 since 2026-11-27:
+    // the Astrologian's optOpenerCardDelay (s) in AST_ST_DPS.json and AST_AoE_DPS.json.
+    E2E("value options at 0 or 1 are \"number\" (a text field in the settings, not a checkbox)", unmarked.Count == 0 && marked == 49,
         $"{marked} marked; {string.Join(", ", unmarked)}");
 
     // The trash burst hold in every job's DPS files (the user, 2026-11-03: "Apply the hold 2min burst for trash to all
@@ -2016,6 +2017,16 @@ E2E("AST examples embedded", new[] { "AST_ST_DPS", "AST_AoE_DPS", "AST_ST_Heal",
         new[] { "DMU_Mit_WHM.json", "DMU_Mit_AST.json" }.All(f => AstDefines(f)["ueBusters"] == "enemyCast(UltimateEmbrace) && enemyCastIn(UltimateEmbrace) > 0.2 && sinceCast(UltimateEmbrace) >= 0.6"));
     E2E("AST_AoE_DPS.json: trash Macrocosmos waits for Divination unless it is over 15 s off or held",
         Prop<string>(AR(AstRules("AST_AoE_DPS.json"), "Macrocosmos (a pack)"), "WhenSource").EndsWith("&& (divUp || cd(Divination) > 15 || holdDiv)"));
+    // 2026-11-27 (user: "AST arcana are going out too early in the opener"): the opener's Play I card waits 2 s after Divination
+    // (a GCD later, not its own weave window), as the 24 Astrologians of the user's Dancing Mad logs played it (median 2.0 s).
+    foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json" })
+    {
+        var d = AstDefines(f);
+        var play = Prop<string>(AR(AstRules(f), "Play I (The Balance or The Spear) in Divination"), "WhenSource");
+        E2E($"{f}: the opener's Play I card 2 s after Divination (optOpenerCardDelay, cardWait), only in the first 30 s",
+            d["optOpenerCardDelay"] == "2" && d["cardWait"] == "optOpenerCardDelay > 0 && combatTime < 30 && justUsed(Divination, optOpenerCardDelay)"
+            && play.EndsWith("&& (divUp || !learned(Divination)) && !cardWait"), play);
+    }
     foreach (var f in new[] { "AST_ST_DPS.json", "AST_AoE_DPS.json", "AST_ST_Heal.json", "AST_AoE_Heal.json" })
     {
         var text = File.ReadAllText(Path.Combine(examples, f));

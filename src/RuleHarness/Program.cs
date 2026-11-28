@@ -367,7 +367,9 @@ if (malSet is not null)
     E2E("SAM_Lv100_SlowMAL: Meikyo stacks only on missing Sen; Tendo at 3 Sen under Meikyo with the buffs down; Higanbana under Meikyo needs Fugetsu after the Tendo",
         MSrc("Meikyo Kasha") == "meikyo && !gauge(HasKa)" && MSrc("Meikyo Gekko") == "meikyo && !gauge(HasGetsu)" && MSrc("Meikyo Yukikaze") == "meikyo && !gauge(HasSetsu)"
         && malRules.Where(r => Prop<string>(r, "Name").StartsWith("Meikyo ") && Prop<uint>(r, "ActionId") is 7481 or 7482 or 7480).All(r => !Prop<string>(r, "WhenSource").Contains("!buff(Fu"))
-        && MSrc("Midare / Tendo Setsugekka").Contains("(buffsUp || meikyo)") && MSrc("Higanbana").Contains("(buffsUp || meikyo && !tendo && buff(Fugetsu))"));
+        && MSrc("Midare / Tendo Setsugekka").Contains("(buffsUp || meikyo)") && MSrc("Higanbana").Contains("(buffsUp || meikyo && !tendo && buff(Fugetsu))")
+        // and no second Meikyo right after one at a phase's start (back-to-back Meikyos are the 6th-minute reset's)
+        && MSrc("Meikyo after downtime").EndsWith("&& chargeForRaid && !recentBurst"));
     E2E("SAM_Lv100_SlowMAL: during the end-of-Phase-1 Meikyo hold the True North reserve counts to Phase 2's Meikyo (208 s)",
         malDefs["meikyoIn"].Contains("if(p1Ending, max(0, 208 - combatTime)") && Math.Abs(MIn(1, 190) - 18) < 1e-6 && MIn(1, 210) == 0 && MIn(0, 190) == 0
         && After(1, 15, MIn(1, 190)) == 1 && After(1, 25, MIn(1, 190)) == 0,
